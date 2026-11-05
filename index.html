@@ -68,7 +68,11 @@
   .cmitem .dot{width:26px; height:26px; border-radius:8px; display:inline-flex; align-items:center; justify-content:center;
     color:#fff; font-size:12px; flex:0 0 auto}
   .cmitem .cnt{margin-left:auto; color:var(--muted); font-size:12px}
-  body.haswp .brand h1, body.haswp .brand .sub, body.haswp .clockbox{text-shadow:0 1px 10px var(--bg), 0 0 3px var(--bg)}
+  /* header text over a wallpaper: light text for dark images, dark text for light images */
+  body.wpt-light .brand h1, body.wpt-light .clockbox .clock{color:#fff}
+  body.wpt-light .brand .sub, body.wpt-light .clockbox, body.wpt-light #statLine{color:rgba(255,255,255,.88)}
+  body.wpt-light .brand h1, body.wpt-light .brand .sub, body.wpt-light .clockbox{text-shadow:0 1px 6px rgba(0,0,0,.55)}
+  body.wpt-dark .brand h1, body.wpt-dark .brand .sub, body.wpt-dark .clockbox{text-shadow:0 1px 6px rgba(255,255,255,.6)}
 
   /* ---------- sections ---------- */
   main{max-width:1180px; margin:0 auto; padding:4px 16px 90px}
@@ -310,6 +314,8 @@
     </div>
     <div class="swrow"><span>默认主题（自动=跟随系统）</span>
       <select id="setTheme"><option value="auto">自动</option><option value="light">浅色</option><option value="dark">深色</option></select></div>
+    <div class="swrow"><span>标题文字（有背景图时）</span>
+      <select id="setWpText"><option value="auto">自动（按背景明暗）</option><option value="light">浅色</option><option value="dark">深色</option></select></div>
     <div class="swrow"><span>桌面每行卡片数</span><input type="number" id="setColsD" min="2" max="8"></div>
     <div class="swrow"><span>手机每行卡片数</span><input type="number" id="setColsM" min="2" max="5"></div>
     <div class="swrow"><span>显示「常去」自动区</span><input type="checkbox" id="setFreq"></div>
@@ -431,11 +437,49 @@ function applySettings() {
   const bg = $('#bgimg');
   if (st.wallpaper) { bg.style.backgroundImage = `url("${st.wallpaper}")`; bg.style.display = 'block'; }
   else { bg.style.display = 'none'; bg.style.backgroundImage = ''; }
-  document.body.classList.toggle('haswp', !!st.wallpaper);
   document.documentElement.style.setProperty('--wpo', ((st.overlay == null ? 50 : +st.overlay) / 100));
+  applyWpTextMode(st);
   let theme = localStorage.getItem('ymnav_theme') || st.theme || 'auto';
   if (theme === 'auto') theme = matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
   document.documentElement.dataset.theme = theme;
+}
+
+/* ---------------- header text over wallpaper ---------------- */
+function setWpTextClass(mode) {
+  document.body.classList.toggle('wpt-light', mode === 'light');
+  document.body.classList.toggle('wpt-dark', mode === 'dark');
+}
+function sampleWpBrightness(url) {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => {
+      try {
+        const c = document.createElement('canvas'); c.width = 32; c.height = 32;
+        const x = c.getContext('2d');
+        x.drawImage(img, 0, 0, 32, 32);
+        const d = x.getImageData(0, 0, 32, 10).data; // top strip ≈ header area
+        let sum = 0, n = 0;
+        for (let i = 0; i < d.length; i += 4) { sum += (0.2126 * d[i] + 0.7152 * d[i + 1] + 0.0722 * d[i + 2]) / 255; n++; }
+        resolve(n ? sum / n : null);
+      } catch { resolve(null); }
+    };
+    img.onerror = () => resolve(null);
+    img.src = url;
+  });
+}
+async function applyWpTextMode(st) {
+  if (!st.wallpaper) { setWpTextClass(''); return; }
+  const pref = st.wpText || 'auto';
+  if (pref === 'light') { setWpTextClass('light'); return; }
+  if (pref === 'dark') { setWpTextClass('dark'); return; }
+  if (S._wpBrightFor === st.wallpaper && S._wpBright != null) {
+    setWpTextClass(S._wpBright < 0.5 ? 'light' : 'dark');
+    return;
+  }
+  const b = await sampleWpBrightness(st.wallpaper);
+  if ((S.cfg.settings || {}).wallpaper !== st.wallpaper) return; // wallpaper changed meanwhile
+  S._wpBrightFor = st.wallpaper; S._wpBright = b;
+  setWpTextClass(b == null ? 'dark' : (b < 0.5 ? 'light' : 'dark'));
 }
 
 /* ---------------- render ---------------- */
@@ -449,16 +493,15 @@ function badgeHtml(l) {
 function iconHtml(l, sec) {
   const color = l.color || sec.accent || '#6366f1';
   if (l.icon) return `<div class="ic" style="color:${esc(color)}"><i class="${esc(l.icon)}"></i></div>`;
-  const host = hostOf(l.url);
   const letter = esc((l.name || '?').trim().charAt(0) || '?');
-  return `<div class="ic" style="color:${esc(color)}"><img data-fav data-step="0" data-host="${esc(host)}" data-letter="${letter}" src="https://www.google.com/s2/favicons?domain=${encodeURIComponent(host)}&sz=128" alt="" loading="lazy"><span class="letter" style="display:none">${letter}</span></div>`;
+  return `<div class="ic" style="color:${esc(color)}"><img data-fav src="/api/icon?u=${encodeURIComponent(l.url)}" alt="" loading="lazy"><span class="letter" style="display:none">${letter}</span></div>`;
 }
 document.addEventListener('error', (e) => {
   const img = e.target;
   if (!img || img.tagName !== 'IMG' || !img.dataset || img.dataset.fav === undefined) return;
-  const step = +img.dataset.step || 0;
-  if (step === 0 && img.dataset.host) { img.dataset.step = '1'; img.src = `https://${img.dataset.host}/favicon.ico`; }
-  else { img.style.display = 'none'; const s = img.parentNode && img.parentNode.querySelector('.letter'); if (s) s.style.display = ''; }
+  img.style.display = 'none';
+  const s = img.parentNode && img.parentNode.querySelector('.letter');
+  if (s) s.style.display = '';
 }, true);
 
 function tileHtml(l, sec) {
@@ -821,6 +864,7 @@ $('#abSettings').addEventListener('click', () => {
   $('#setName').value = st.siteName || ''; $('#setNameEn').value = st.siteNameEn || '';
   $('#setWallpaper').value = st.wallpaper || ''; $('#setTheme').value = st.theme || 'auto';
   $('#setOverlay').value = st.overlay == null ? 50 : st.overlay; $('#ovVal').textContent = $('#setOverlay').value + '%';
+  $('#setWpText').value = st.wpText || 'auto';
   $('#setColsD').value = st.colsDesktop || 5; $('#setColsM').value = st.colsMobile || 3;
   $('#setFreq').checked = st.showFrequent !== false; $('#setNewTab').checked = st.openInNewTab !== false;
   open('#mSettings');
@@ -832,7 +876,7 @@ $('#setSave').addEventListener('click', async () => {
   const st = S.cfg.settings;
   st.siteName = $('#setName').value.trim() || st.siteName; st.siteNameEn = $('#setNameEn').value.trim();
   if (!st.siteNameEn && st.siteName) { const t = await translateName(st.siteName); if (t) st.siteNameEn = t; }
-  st.wallpaper = $('#setWallpaper').value.trim(); st.theme = $('#setTheme').value; st.overlay = +$('#setOverlay').value;
+  st.wallpaper = $('#setWallpaper').value.trim(); st.theme = $('#setTheme').value; st.overlay = +$('#setOverlay').value; st.wpText = $('#setWpText').value;
   st.colsDesktop = +$('#setColsD').value || 5; st.colsMobile = +$('#setColsM').value || 3;
   st.showFrequent = $('#setFreq').checked; st.openInNewTab = $('#setNewTab').checked;
   localStorage.removeItem('ymnav_theme');
