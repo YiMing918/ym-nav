@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<title>科技共享</title>
+<title>我的导航</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🧭</text></svg>">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
 <style>
@@ -36,7 +36,7 @@
   /* ---------- header ---------- */
   header{max-width:1180px; margin:0 auto; padding:26px 16px 6px;}
   .toprow{display:flex; align-items:flex-end; justify-content:space-between; gap:12px; flex-wrap:wrap}
-  .brand h1{margin:0; font-size:27px; font-weight:800; letter-spacing:.5px}
+  .brand h1{margin:0; font-size:27px; font-weight:800; letter-spacing:.5px; cursor:pointer; user-select:none; -webkit-user-select:none; touch-action:manipulation}
   .brand .sub{color:var(--muted); font-size:13px; margin-top:3px}
   .clockbox{text-align:right; color:var(--muted); font-size:13px; line-height:1.5}
   .clockbox .clock{font-size:21px; font-weight:700; color:var(--text); font-variant-numeric:tabular-nums}
@@ -156,7 +156,7 @@
 <header>
   <div class="toprow">
     <div class="brand">
-      <h1 id="siteName">科技共享</h1>
+      <h1 id="siteName">我的导航</h1>
       <div class="sub" id="greetLine">愿你每次出发，都直达。</div>
     </div>
     <div class="clockbox">
@@ -168,7 +168,6 @@
   <div class="toolbar">
     <button class="tbtn" id="langBtn">EN</button>
     <button class="tbtn" id="themeBtn"><i class="fa-solid fa-circle-half-stroke"></i></button>
-    <button class="tbtn" id="adminBtn"><i class="fa-solid fa-gear"></i> <span data-i18n="admin">管理</span></button>
     <span style="flex:1"></span>
     <span class="hint" id="statLine"></span>
   </div>
@@ -194,8 +193,7 @@
 <main id="main"></main>
 
 <footer id="siteFooter">
-  <span id="footText">科技共享 · YM Nav</span>
-  <span id="footHint"> · 双击这里进后台</span>
+  <span id="footText">我的导航</span>
 </footer>
 
 <div id="adminbar">
@@ -330,7 +328,7 @@
       以后在任何网页点它，就能一键把当前页收藏进本站：</p>
     <p style="text-align:center"><a class="bmlet" id="bmlet" href="#">＋ 收藏到本站</a></p>
     <p class="hint">键盘快捷键：按 <b>/</b> 快速聚焦搜索框，<b>Esc</b> 清空搜索；
-      双击页面底部页脚也能进后台。</p>
+      双击首页大标题（站名）进后台。</p>
     <div class="btns"><button class="btn ghost" data-close>关闭</button></div>
   </div>
 </div>
@@ -403,7 +401,7 @@ function applySettings() {
   r.setProperty('--cm', m); r.setProperty('--cmw', Math.max(1, Math.ceil(m / 2)));
   document.title = st.siteName || '导航';
   $('#siteName').textContent = S.lang === 'en' ? (st.siteNameEn || st.siteName || '') : (st.siteName || '');
-  $('#footText').textContent = (st.siteName || '') + ' · YM Nav';
+  $('#footText').textContent = st.siteName || '';
   const bg = $('#bgimg');
   if (st.wallpaper) { bg.style.backgroundImage = `url("${st.wallpaper}")`; bg.style.display = 'block'; }
   else { bg.style.display = 'none'; bg.style.backgroundImage = ''; }
@@ -478,7 +476,7 @@ function render() {
     total += links.length;
     html += `<section class="blk" id="sec-${esc(s.id)}"><div class="blkhead"><span class="dot" style="background:${esc(s.accent || '#6366f1')}"><i class="${esc(s.icon || 'fa-solid fa-folder')}"></i></span><h2>${esc(secName(s))}</h2>${s.private ? '<i class="fa-solid fa-lock" style="color:var(--muted);font-size:12px"></i>' : ''}<span class="cnt">${links.length}</span><span class="sp"></span>${S.edit ? `<button class="mini" data-addto="${esc(s.id)}">＋ ${T('加网站', 'Add')}</button>` : ''}</div><div class="grid ${s.layout === 'wide' ? 'wide' : ''}">${links.map((l) => tileHtml(l, s)).join('')}</div></section>`;
   }
-  if (!secs.length) html = `<div class="empty">${T('还没有任何收藏。点右上角「管理」登录后，在「数据」里导入备份，或逐个添加。', 'No bookmarks yet. Log in via Manage to import or add.')}</div>`;
+  if (!secs.length) html = `<div class="empty">${T('还没有任何收藏。双击上方站名登录后，在「数据」里导入备份，或逐个添加。', 'No bookmarks yet. Double-click the site name to log in, then import or add.')}</div>`;
   else if (S.query && !total) html = `<div class="empty">${T('站内没有找到，试试用上面的搜索引擎搜全网。', 'Not found locally. Try a web engine above.')}</div>`;
   $('#main').innerHTML = html;
   const all = allLinks().length;
@@ -487,7 +485,6 @@ function render() {
   $('#adminbar').classList.toggle('show', S.authed);
   $('#abEdit').classList.toggle('on', S.edit);
   document.body.classList.toggle('editing', S.edit);
-  $('#footHint').style.display = S.authed ? 'none' : '';
 }
 
 /* ---------------- clock / weather / greeting ---------------- */
@@ -512,23 +509,24 @@ function geoPosition() {
     );
   });
 }
+async function cityName(lat, lon) {
+  // Reverse geocode with Simplified Chinese (zh-CN) names
+  try {
+    const r = await fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lon}&zoom=10&accept-language=zh-CN`);
+    const d = await r.json();
+    const a = d.address || {};
+    return a.city || a.town || a.county || a.state || '本地';
+  } catch { return '本地'; }
+}
 async function locate() {
-  // 1) browser/phone geolocation (one-time permission), city name via free reverse geocode
+  // 1) browser/phone geolocation (one-time permission)
   const g = await geoPosition();
-  if (g) {
-    let city = '本地';
-    try {
-      const rr = await fetch(`https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${g.lat}&longitude=${g.lon}&localityLanguage=zh`);
-      const dd = await rr.json();
-      city = dd.city || dd.locality || '本地';
-    } catch { /* keep default label */ }
-    return { ...g, city, ts: Date.now() };
-  }
+  if (g) return { ...g, city: await cityName(g.lat, g.lon), ts: Date.now() };
   // 2) IP-based location
   try {
     const r = await fetch('https://ipapi.co/json/');
     const d = await r.json();
-    if (d && d.latitude) return { lat: d.latitude, lon: d.longitude, city: d.city || '本地', ts: Date.now() };
+    if (d && d.latitude) return { lat: d.latitude, lon: d.longitude, city: await cityName(d.latitude, d.longitude), ts: Date.now() };
   } catch { /* fall through */ }
   // 3) last resort default
   return { lat: 34.329, lon: 108.709, city: '咸阳', ts: Date.now() };
@@ -633,8 +631,7 @@ $('#loginGo').addEventListener('click', async () => {
   } catch (e) { toast(e.message === 'wrong credentials' ? T('账号或密码不对', 'Wrong username or password') : T('失败：', 'Failed: ') + e.message); }
 });
 $('#loginPwd').addEventListener('keydown', (e) => { if (e.key === 'Enter') $('#loginGo').click(); });
-$('#adminBtn').addEventListener('click', () => { if (S.authed) { $('#adminbar').scrollIntoView({ behavior: 'smooth', block: 'end' }); toast(T('已登录，用底部工具条管理', 'Logged in, use the bottom bar')); } else openLogin(); });
-$('#siteFooter').addEventListener('dblclick', () => { if (!S.authed) openLogin(); });
+$('#siteName').addEventListener('dblclick', () => { if (!S.authed) openLogin(); });
 $('#abLogout').addEventListener('click', async () => {
   await fetch('/api/logout', { method: 'POST' }).catch(() => {});
   S.authed = false; S.edit = false; render(); toast(T('已退出', 'Logged out'));
