@@ -73,9 +73,9 @@
 | --- | --- |
 | ![桌面浅色](docs/preview-desktop.png) | ![桌面深色](docs/preview-dark.png) |
 
-| 移动端 |
-| --- |
-| ![移动端](docs/preview-mobile.png) |
+| 移动端 | 点分类只看该类 | 长按卡片看描述 |
+| --- | --- | --- |
+| ![移动端](docs/preview-mobile.png) | ![单分类视图](docs/preview-single.png) | ![长按描述](docs/preview-desc.png) |
 
 ---
 
@@ -92,6 +92,23 @@
 
 > ⚠️ 实测教训：不推荐「直接上传」zip 的方式——某些情况下直传部署不会生成 Functions，`/api/*` 会全部失效（表现为打开网页正常、但登录和数据都不工作）。Git 连接部署没有这个问题，且之后改代码推送即自动更新。
 
+<details>
+<summary>📸 部署图片教程（点开看图，6 步）</summary>
+
+![部署第1步](docs/tut-deploy-1.png)
+
+![部署第2步](docs/tut-deploy-2.png)
+
+![部署第3步](docs/tut-deploy-3.png)
+
+![部署第4步](docs/tut-deploy-4.png)
+
+![部署第5步](docs/tut-deploy-5.png)
+
+![部署第6步](docs/tut-deploy-6.png)
+
+</details>
+
 ### 方式二：直接上传（仅作备选）
 
 将仓库文件打包（`index.html` 与 `functions/` 位于压缩包根目录）后在 Pages 创建时选择上传；其余 KV 绑定步骤同上。若部署后 `/api/config` 返回的不是 JSON，请改用方式一。
@@ -101,6 +118,21 @@
 ## 🔄 升级版本（更新代码）
 
 本站的代码和数据是分开的：**代码在仓库里，数据在 KV 里**。升级只换代码，收藏、设置、管理员密码、点击记录都不会被覆盖。按下面做即可。
+
+<details>
+<summary>📸 升级图片教程（点开看图，5 步）</summary>
+
+![升级第1步](docs/tut-upgrade-1.png)
+
+![升级第2步](docs/tut-upgrade-2.png)
+
+![升级第3步](docs/tut-upgrade-3.png)
+
+![升级第4步](docs/tut-upgrade-4.png)
+
+![升级第5步](docs/tut-upgrade-5.png)
+
+</details>
 
 ### 升级前（必做）
 
