@@ -117,7 +117,58 @@
 
 ### 方法二：Fork 用户同步上游
 
-在你的 Fork 页面点 **Sync fork → Update branch**，同步完成后 Cloudflare 自动部署，后续步骤同上。
+先记住一个原理：**Cloudflare 只自动部署它连接着的那个仓库**。原仓库更新代码，不会自动流进你的 Fork——你要先把上游更新同步到自己的 Fork，同步完成后 Cloudflare 才会自动部署新版。手动同步步骤：
+
+1. 打开你 Fork 的仓库主页，点分支上方的 **Sync fork**。
+2. 有新提交时点 **Update branch**，等它同步完成。
+3. 到 Cloudflare 控制台确认 Pages 已自动部署完（部署列表最新一条变绿勾）。
+4. 打开你的站点，核对收藏数量、登录、私密分类隐藏是否正常（数据都在 KV 里，同步代码不会动数据）。
+
+> 如果你改过同一处代码、和上游撞了，Sync 会提示冲突、无法一键完成，需要本地用 git 处理一次，或按方法一逐个文件替换。
+
+### 方法二（进阶）：Fork 全自动同步上游
+
+不想每次手动点 Sync fork，可以让 GitHub 每天自动帮你同步，你什么都不用管：
+
+1. 在**你自己的 Fork** 里新建文件 `.github/workflows/sync-upstream.yml`，内容填下面这段：
+2. Fork 的 Actions 默认是关闭的：去 Fork 的 **Actions** 页点一次启用，这个工作流才会开始跑。
+3. 此后每天自动执行一次：把上游 `main` 合并进你的 `main` 并推送；你的 Cloudflare 随即自动部署新版。也可以在 Actions 页手动点 **Run workflow** 立即同步一次。
+
+```yaml
+name: Sync upstream
+
+on:
+  schedule:
+    - cron: '17 3 * * *'   # 每天跑一次（UTC 时间）
+  workflow_dispatch:        # 允许在 Actions 页手动触发
+
+permissions:
+  contents: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Merge upstream main
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git remote add upstream https://github.com/YiMing918/ym-nav.git
+          git fetch upstream
+          git checkout main
+          git merge upstream/main --no-edit
+          git push origin main
+```
+
+注意：
+
+- `upstream` 地址写的是本仓库；你 Fork 的是其他项目时，换成那个仓库的地址。
+- 你改过同一处代码时自动合并会失败（Actions 变红），手动处理一次冲突即可；收藏数据在 KV 里，不受同步影响。
+- GitHub 的规则：仓库 60 天没有任何活动，定时工作流可能被自动暂停，去 Actions 页重新启用即可。
+- 前提是你的 Pages 用的是 Git 连接部署；「直接上传」方式部署的没有自动部署这回事，只能按方法一手动换文件。
 
 ### 方法三：本地 git 推送
 
@@ -209,6 +260,9 @@ KV 内部 key 一览：
 
 **怎么备份？**
 后台「数据」→ 导出 JSON，存好那个文件即可；恢复时在同一处导入。
+
+**原仓库更新了代码，我 Fork 部署的站会自动更新吗？**
+不会自动跨仓库流动。Cloudflare 只自动部署它连接着的那个仓库：Fork 用户先在自己的 Fork 点一次 **Sync fork**（或按「升级版本」一节开启全自动同步），同步完成、你的仓库有了新提交，Cloudflare 才会自动部署。如果是仓库作者本人部署（连的就是自己的仓库），推送即自动部署，没有这一步。
 
 **为什么没有在线演示？**
 导航站的价值就是里面收藏的网址，那些是个人数据，不适合公开。效果看「效果预览」的截图就够了，部署一个自己的只要几分钟。
