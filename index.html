@@ -286,12 +286,8 @@
       <div><label>图标 class</label><input type="text" id="sIcon" placeholder="fa-solid fa-star"></div>
       <div><label>主题色</label><input type="text" id="sAccent" placeholder="#6366f1"></div>
     </div></div>
-    <div class="fld"><div class="row">
-      <div><label>卡片布局</label><select id="sLayout">
-        <option value="card">标准卡片</option><option value="wide">宽卡片</option></select></div>
-      <div><label>链接样式</label><select id="sStyle">
-        <option value="icon">图标+名称</option><option value="text">纯文字</option></select></div>
-    </div></div>
+    <div class="fld"><label>展示样式</label><select id="sCardStyle">
+      <option value="vt">竖排卡片（图标 / 名称 / 域名）</option><option value="wide">横排卡片（图标在左）</option><option value="text">纯文字</option></select></div>
     <div class="swrow"><span>私密分类（隐藏，登录后才可见）</span><input type="checkbox" id="sPrivate"></div>
     <div class="btns"><button class="btn" id="secSave">保存</button>
       <button class="btn danger" id="secDelete" style="display:none">删除分类</button>
@@ -381,6 +377,9 @@
     <div class="btns" style="justify-content:flex-start"><button class="btn sm" id="probeGo">开始测活</button></div>
     <div id="probeProg" class="hint" style="margin-top:8px"></div>
     <div id="probeResults" style="margin-top:6px"></div>
+    <p style="font-weight:700;margin:16px 0 4px">全站卡片样式</p>
+    <p class="hint">把所有分类的卡片统一成同一种展示样式（单个分类的样式在「分类」管理里改）。只改样式，不动任何链接和数据。</p>
+    <div class="btns" style="justify-content:flex-start"><button class="btn sm" id="vtAllBtn">全部改成竖排卡片</button></div>
     <div class="btns"><button class="btn ghost" data-close>关闭</button></div>
   </div>
 </div>
@@ -543,16 +542,21 @@ document.addEventListener('error', (e) => {
   if (s) s.style.display = '';
 }, true);
 
+function secStyle(sec) {
+  if (sec.style) return sec.style;
+  if (sec.linkStyle === 'text') return 'text';
+  return sec.layout === 'wide' ? 'wide' : 'vt';
+}
 function tileHtml(l, sec) {
   const st = S.cfg.settings || {};
   const target = st.openInNewTab === false ? '' : ' target="_blank" rel="noopener"';
   const sub = S.lang === 'en' ? hostOf(l.url) : (l.nameEn || hostOf(l.url));
   const acts = S.edit ? `<span class="acts"><button data-move="-1" title="前移">←</button><button data-move="1" title="后移">→</button></span>` : '';
   const lock = l.private ? ' <i class="fa-solid fa-lock" style="color:var(--muted);font-size:11px"></i>' : '';
-  if (sec.linkStyle === 'text') {
+  if (secStyle(sec) === 'text') {
     return `<a class="tile textonly" href="${esc(l.url)}"${target} data-id="${esc(l.id)}" data-sec="${esc(sec.id)}">${badgeHtml(l)}<div class="tx"><div class="nm">${esc(linkName(l))}${lock}</div></div>${acts}</a>`;
   }
-  if (sec.layout === 'wide') {
+  if (secStyle(sec) === 'wide') {
     return `<a class="tile" href="${esc(l.url)}"${target} data-id="${esc(l.id)}" data-sec="${esc(sec.id)}">${badgeHtml(l)}${iconHtml(l, sec)}<div class="tx"><div class="nm">${esc(linkName(l))}${lock}</div><div class="sb">${esc(sub)}</div></div>${acts}</a>`;
   }
   return `<a class="tile v" href="${esc(l.url)}"${target} data-id="${esc(l.id)}" data-sec="${esc(sec.id)}">${badgeHtml(l)}${iconHtml(l, sec)}<div class="tx"><div class="nm">${esc(linkName(l))}${lock}</div><div class="dm">${esc(hostOf(l.url))}</div></div>${acts}</a>`;
@@ -589,7 +593,7 @@ function render() {
     const links = (s.links || []).filter(matches);
     if (S.query && !links.length) continue;
     total += links.length;
-    html += `<section class="blk" id="sec-${esc(s.id)}"><div class="blkhead"><span class="dot" style="background:${esc(s.accent || '#6366f1')}"><i class="${esc(s.icon || 'fa-solid fa-folder')}"></i></span><h2>${esc(secName(s))}</h2>${s.private ? '<i class="fa-solid fa-lock" style="color:var(--muted);font-size:12px"></i>' : ''}<span class="cnt">${links.length}</span><span class="sp"></span>${S.edit ? `<button class="mini" data-addto="${esc(s.id)}">＋ ${T('加网站', 'Add')}</button>` : ''}</div><div class="grid ${s.layout === 'wide' ? 'wide' : 'vt'}">${links.map((l) => tileHtml(l, s)).join('')}</div></section>`;
+    html += `<section class="blk" id="sec-${esc(s.id)}"><div class="blkhead"><span class="dot" style="background:${esc(s.accent || '#6366f1')}"><i class="${esc(s.icon || 'fa-solid fa-folder')}"></i></span><h2>${esc(secName(s))}</h2>${s.private ? '<i class="fa-solid fa-lock" style="color:var(--muted);font-size:12px"></i>' : ''}<span class="cnt">${links.length}</span><span class="sp"></span>${S.edit ? `<button class="mini" data-addto="${esc(s.id)}">＋ ${T('加网站', 'Add')}</button>` : ''}</div><div class="grid ${secStyle(s) === 'wide' ? 'wide' : secStyle(s) === 'vt' ? 'vt' : ''}">${links.map((l) => tileHtml(l, s)).join('')}</div></section>`;
   }
   if (!secs.length) html = `<div class="empty">${T('还没有任何收藏。双击上方站名登录后，在「数据」里导入备份，或逐个添加。', 'No bookmarks yet. Double-click the site name to log in, then import or add.')}</div>`;
   else if (S.query && !total) html = `<div class="empty">${T('站内没有找到，试试用上面的搜索引擎搜全网。', 'Not found locally. Try a web engine above.')}</div>`;
@@ -847,8 +851,7 @@ function openSectionEditor(sec) {
   $('#sNameEn').value = sec ? (sec.titleEn || '') : '';
   $('#sIcon').value = sec ? (sec.icon || '') : 'fa-solid fa-folder';
   $('#sAccent').value = sec ? (sec.accent || '') : '#6366f1';
-  $('#sLayout').value = sec ? (sec.layout || 'card') : 'card';
-  $('#sStyle').value = sec ? (sec.linkStyle || 'icon') : 'icon';
+  $('#sCardStyle').value = sec ? secStyle(sec) : 'vt';
   $('#sPrivate').checked = sec ? !!sec.private : false;
   $('#secDelete').style.display = sec ? '' : 'none';
   open('#mSection');
@@ -856,7 +859,8 @@ function openSectionEditor(sec) {
 $('#secSave').addEventListener('click', async () => {
   const title = $('#sName').value.trim();
   if (!title) { toast(T('分类名不能为空', 'Name required')); return; }
-  const data = { title, titleEn: $('#sNameEn').value.trim(), icon: $('#sIcon').value.trim() || 'fa-solid fa-folder', accent: $('#sAccent').value.trim() || '#6366f1', layout: $('#sLayout').value, linkStyle: $('#sStyle').value, private: $('#sPrivate').checked };
+  const cs = $('#sCardStyle').value;
+  const data = { title, titleEn: $('#sNameEn').value.trim(), icon: $('#sIcon').value.trim() || 'fa-solid fa-folder', accent: $('#sAccent').value.trim() || '#6366f1', style: cs, layout: cs === 'wide' ? 'wide' : 'card', linkStyle: cs === 'text' ? 'text' : 'icon', private: $('#sPrivate').checked };
   if (secCtx.id) { const sec = S.cfg.sections.find((s) => s.id === secCtx.id); Object.assign(sec, data); }
   else S.cfg.sections.push({ id: uid('sec_'), links: [], ...data });
   $('#mSection').classList.remove('open');
@@ -1107,6 +1111,19 @@ $('#abTools').addEventListener('click', () => {
 });
 
 /* ---------------- liveness probe ---------------- */
+let vtArm = null;
+$('#vtAllBtn').addEventListener('click', async () => {
+  const btn = $('#vtAllBtn');
+  if (!vtArm) {
+    btn.textContent = T('再点一次确认：全部改竖排', 'Click again to confirm');
+    vtArm = setTimeout(() => { vtArm = null; btn.textContent = T('全部改成竖排卡片', 'Make all vertical'); }, 3500);
+    return;
+  }
+  clearTimeout(vtArm); vtArm = null;
+  btn.textContent = T('全部改成竖排卡片', 'Make all vertical');
+  for (const s of S.cfg.sections) { s.style = 'vt'; s.layout = 'card'; s.linkStyle = 'icon'; }
+  if (await save(true)) { toast(T('全站已改成竖排卡片', 'All sections are vertical now')); render(); }
+});
 $('#probeGo').addEventListener('click', async () => {
   const btn = $('#probeGo');
   const prog = $('#probeProg'), box = $('#probeResults');
