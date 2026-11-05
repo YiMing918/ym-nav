@@ -28,7 +28,7 @@
   body{margin:0; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
     background:var(--bg); color:var(--text); min-height:100vh;}
   #bgimg{position:fixed; inset:0; background-size:cover; background-position:center; z-index:-2; display:none}
-  #bgimg::after{content:''; position:absolute; inset:0; background:var(--bg); opacity:.5}
+  #bgimg::after{content:''; position:absolute; inset:0; background:var(--bg); opacity:var(--wpo,.5)}
   a{color:inherit; text-decoration:none}
   button{font-family:inherit; cursor:pointer}
   input,select,textarea{font-family:inherit; font-size:14px; color:var(--text)}
@@ -56,18 +56,23 @@
   .searchbar .go{border:none; background:var(--accent); color:#fff; border-radius:999px; padding:9px 18px; font-size:14px}
   .searchhint{color:var(--muted); font-size:12px; margin:8px 4px 0; min-height:15px}
 
-  /* ---------- chips ---------- */
-  .chips{max-width:1180px; margin:12px auto 0; padding:2px 16px; display:flex; gap:8px;
-    overflow-x:auto; scrollbar-width:none; position:sticky; top:0; z-index:30;
-    background:linear-gradient(var(--bg) 78%, transparent); padding-bottom:10px}
-  .chips::-webkit-scrollbar{display:none}
-  .chip{flex:0 0 auto; border:1px solid var(--border); background:var(--card); color:var(--text);
-    border-radius:999px; padding:6px 14px; font-size:13px; box-shadow:var(--shadow)}
-  .chip.on{background:var(--accent); color:#fff; border-color:var(--accent)}
+  /* ---------- category menu ---------- */
+  .toolbar{position:relative}
+  .catmenu{position:absolute; left:0; top:calc(100% + 8px); z-index:60; min-width:230px; max-width:82vw;
+    max-height:62vh; overflow-y:auto; background:var(--card); border:1px solid var(--border);
+    border-radius:14px; box-shadow:0 12px 34px rgba(20,24,40,.18); padding:6px}
+  .catmenu[hidden]{display:none}
+  .cmitem{display:flex; align-items:center; gap:10px; width:100%; text-align:left; border:none; background:transparent;
+    color:var(--text); padding:10px 10px; border-radius:9px; font-size:14px; cursor:pointer}
+  .cmitem:hover{background:var(--card-hover)}
+  .cmitem .dot{width:26px; height:26px; border-radius:8px; display:inline-flex; align-items:center; justify-content:center;
+    color:#fff; font-size:12px; flex:0 0 auto}
+  .cmitem .cnt{margin-left:auto; color:var(--muted); font-size:12px}
+  body.haswp .brand h1, body.haswp .brand .sub, body.haswp .clockbox{text-shadow:0 1px 10px var(--bg), 0 0 3px var(--bg)}
 
   /* ---------- sections ---------- */
   main{max-width:1180px; margin:0 auto; padding:4px 16px 90px}
-  section.blk{margin-top:26px; scroll-margin-top:64px}
+  section.blk{margin-top:26px; scroll-margin-top:14px}
   .blkhead{display:flex; align-items:center; gap:9px; margin:0 2px 12px}
   .blkhead .dot{width:30px; height:30px; border-radius:9px; display:flex; align-items:center; justify-content:center;
     color:#fff; font-size:14px; flex:0 0 auto}
@@ -166,10 +171,12 @@
     </div>
   </div>
   <div class="toolbar">
+    <button class="tbtn" id="catBtn"><i class="fa-solid fa-layer-group"></i> <span id="catBtnTx">分类</span> <i class="fa-solid fa-chevron-down" style="font-size:10px"></i></button>
     <button class="tbtn" id="langBtn">EN</button>
     <button class="tbtn" id="themeBtn"><i class="fa-solid fa-circle-half-stroke"></i></button>
     <span style="flex:1"></span>
     <span class="hint" id="statLine"></span>
+    <div class="catmenu" id="catMenu" hidden></div>
   </div>
 </header>
 
@@ -189,7 +196,7 @@
   <div class="searchhint" id="searchHint"></div>
 </div>
 
-<nav class="chips" id="chips"></nav>
+
 <main id="main"></main>
 
 <footer id="siteFooter">
@@ -296,6 +303,10 @@
         <input type="file" id="wpFile" accept="image/*" hidden>
       </div>
       <p class="hint">两种方式二选一：填图片链接，或上传本地图片（自动压缩、存到站点服务器，换设备也能看到）。上传后上面的地址会自动填好，点保存设置生效。</p>
+    </div>
+    <div class="fld"><label>背景遮罩浓度 <span id="ovVal" style="color:var(--muted);font-weight:400"></span></label>
+      <input type="range" id="setOverlay" min="0" max="90" step="5" value="50" style="width:100%">
+      <p class="hint">盖在背景图上的那层底色：调低背景更清晰，调高文字更好读。拖动即时预览，点保存设置后长期生效。</p>
     </div>
     <div class="swrow"><span>默认主题（自动=跟随系统）</span>
       <select id="setTheme"><option value="auto">自动</option><option value="light">浅色</option><option value="dark">深色</option></select></div>
@@ -420,6 +431,8 @@ function applySettings() {
   const bg = $('#bgimg');
   if (st.wallpaper) { bg.style.backgroundImage = `url("${st.wallpaper}")`; bg.style.display = 'block'; }
   else { bg.style.display = 'none'; bg.style.backgroundImage = ''; }
+  document.body.classList.toggle('haswp', !!st.wallpaper);
+  document.documentElement.style.setProperty('--wpo', ((st.overlay == null ? 50 : +st.overlay) / 100));
   let theme = localStorage.getItem('ymnav_theme') || st.theme || 'auto';
   if (theme === 'auto') theme = matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
   document.documentElement.dataset.theme = theme;
@@ -470,10 +483,11 @@ function render() {
   applySettings();
   const secs = S.cfg.sections || [];
   const st = S.cfg.settings || {};
-  // chips
-  let chips = `<button class="chip" data-jump="top">${T('全部', 'All')}</button>`;
-  for (const s of secs) chips += `<button class="chip" data-jump="${esc(s.id)}">${esc(secName(s))}</button>`;
-  $('#chips').innerHTML = chips;
+  // category menu (top-left 分类 button dropdown)
+  $('#catBtnTx').textContent = T('分类', 'Categories');
+  let menu = `<button class="cmitem" data-jump="top"><span class="dot" style="background:#6366f1"><i class="fa-solid fa-border-all"></i></span>${T('全部（回到顶部）', 'All (back to top)')}<span class="cnt">${secs.reduce((a, s) => a + (s.links || []).length, 0)}</span></button>`;
+  for (const s of secs) menu += `<button class="cmitem" data-jump="${esc(s.id)}"><span class="dot" style="background:${esc(s.accent || '#6366f1')}"><i class="${esc(s.icon || 'fa-solid fa-folder')}"></i></span>${esc(secName(s))}${s.private ? ' <i class="fa-solid fa-lock" style="color:var(--muted);font-size:11px"></i>' : ''}<span class="cnt">${(s.links || []).length}</span></button>`;
+  $('#catMenu').innerHTML = menu;
   // frequent
   let html = '';
   if (st.showFrequent !== false && !S.query) {
@@ -585,10 +599,19 @@ document.addEventListener('keydown', (e) => {
 });
 
 /* ---------------- navigation / clicks ---------------- */
-$('#chips').addEventListener('click', (e) => {
-  const chip = e.target.closest('[data-jump]'); if (!chip) return;
-  if (chip.dataset.jump === 'top') { scrollTo({ top: 0, behavior: 'smooth' }); return; }
-  const el = document.getElementById('sec-' + chip.dataset.jump);
+$('#catBtn').addEventListener('click', (e) => {
+  e.stopPropagation();
+  const m = $('#catMenu'); m.hidden = !m.hidden;
+});
+document.addEventListener('click', (e) => {
+  const m = $('#catMenu');
+  if (!m.hidden && !m.contains(e.target)) m.hidden = true;
+});
+$('#catMenu').addEventListener('click', (e) => {
+  const item = e.target.closest('[data-jump]'); if (!item) return;
+  $('#catMenu').hidden = true;
+  if (item.dataset.jump === 'top') { scrollTo({ top: 0, behavior: 'smooth' }); return; }
+  const el = document.getElementById('sec-' + item.dataset.jump);
   if (el) el.scrollIntoView({ behavior: 'smooth' });
 });
 $('#main').addEventListener('click', (e) => {
@@ -797,6 +820,7 @@ $('#abSettings').addEventListener('click', () => {
   const st = S.cfg.settings || {};
   $('#setName').value = st.siteName || ''; $('#setNameEn').value = st.siteNameEn || '';
   $('#setWallpaper').value = st.wallpaper || ''; $('#setTheme').value = st.theme || 'auto';
+  $('#setOverlay').value = st.overlay == null ? 50 : st.overlay; $('#ovVal').textContent = $('#setOverlay').value + '%';
   $('#setColsD').value = st.colsDesktop || 5; $('#setColsM').value = st.colsMobile || 3;
   $('#setFreq').checked = st.showFrequent !== false; $('#setNewTab').checked = st.openInNewTab !== false;
   open('#mSettings');
@@ -808,7 +832,7 @@ $('#setSave').addEventListener('click', async () => {
   const st = S.cfg.settings;
   st.siteName = $('#setName').value.trim() || st.siteName; st.siteNameEn = $('#setNameEn').value.trim();
   if (!st.siteNameEn && st.siteName) { const t = await translateName(st.siteName); if (t) st.siteNameEn = t; }
-  st.wallpaper = $('#setWallpaper').value.trim(); st.theme = $('#setTheme').value;
+  st.wallpaper = $('#setWallpaper').value.trim(); st.theme = $('#setTheme').value; st.overlay = +$('#setOverlay').value;
   st.colsDesktop = +$('#setColsD').value || 5; st.colsMobile = +$('#setColsM').value || 3;
   st.showFrequent = $('#setFreq').checked; st.openInNewTab = $('#setNewTab').checked;
   localStorage.removeItem('ymnav_theme');
@@ -847,6 +871,10 @@ $('#wpFile').addEventListener('change', async () => {
     $('#setWallpaper').value = '/api/wallpaper?v=' + Date.now();
     toast(T('背景图已上传，点「保存设置」生效', 'Uploaded — press Save settings to apply'));
   } catch { toast(T('上传失败，请换一张图重试', 'Upload failed, try another image')); }
+});
+$('#setOverlay').addEventListener('input', () => {
+  $('#ovVal').textContent = $('#setOverlay').value + '%';
+  document.documentElement.style.setProperty('--wpo', $('#setOverlay').value / 100);
 });
 $('#wpClear').addEventListener('click', async () => {
   await fetch('/api/wallpaper', { method: 'DELETE' }).catch(() => {});
