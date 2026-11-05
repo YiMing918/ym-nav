@@ -534,10 +534,10 @@ async function locate() {
 async function weather() {
   try {
     let loc = null;
-    try { loc = JSON.parse(localStorage.getItem('ymnav_loc') || 'null'); } catch { /* ignore */ }
+    try { loc = JSON.parse(localStorage.getItem('ymnav_loc2') || 'null'); } catch { /* ignore */ }
     if (!loc || Date.now() - (loc.ts || 0) > 24 * 3600 * 1000) {
       loc = await locate();
-      try { localStorage.setItem('ymnav_loc', JSON.stringify(loc)); } catch { /* ignore */ }
+      try { localStorage.setItem('ymnav_loc2', JSON.stringify(loc)); } catch { /* ignore */ }
     }
     if (!loc) return;
     const r = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${loc.lat}&longitude=${loc.lon}&current=temperature_2m,weather_code&timezone=auto`);
@@ -631,7 +631,12 @@ $('#loginGo').addEventListener('click', async () => {
   } catch (e) { toast(e.message === 'wrong credentials' ? T('账号或密码不对', 'Wrong username or password') : T('失败：', 'Failed: ') + e.message); }
 });
 $('#loginPwd').addEventListener('keydown', (e) => { if (e.key === 'Enter') $('#loginGo').click(); });
-$('#siteName').addEventListener('dblclick', () => { if (!S.authed) openLogin(); });
+let lastTitleTap = 0;
+$('#siteName').addEventListener('click', () => {
+  const now = Date.now();
+  if (now - lastTitleTap < 350) { lastTitleTap = 0; if (!S.authed) openLogin(); }
+  else lastTitleTap = now;
+});
 $('#abLogout').addEventListener('click', async () => {
   await fetch('/api/logout', { method: 'POST' }).catch(() => {});
   S.authed = false; S.edit = false; render(); toast(T('已退出', 'Logged out'));
