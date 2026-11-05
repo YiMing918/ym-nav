@@ -331,6 +331,12 @@
     <p style="text-align:center"><a class="bmlet" id="bmlet" href="#">＋ 收藏到本站</a></p>
     <p class="hint">键盘快捷键：按 <b>/</b> 快速聚焦搜索框，<b>Esc</b> 清空搜索；
       双击首页大标题（站名）进后台。</p>
+    <p style="font-weight:700;margin:16px 0 4px">链接测活</p>
+    <p class="hint">一键检测全部收藏是否可达（由服务器逐个探测）。结果分三类：
+      <b>正常</b> / <b>疑似失效</b>（明确返回 404、410）/ <b>无法判定</b>（超时、服务器错误、被对方拦截等——不等于死了，别急着删）。</p>
+    <div class="btns" style="justify-content:flex-start"><button class="btn sm" id="probeGo">开始测活</button></div>
+    <div id="probeProg" class="hint" style="margin-top:8px"></div>
+    <div id="probeResults" style="margin-top:6px"></div>
     <div class="btns"><button class="btn ghost" data-close>关闭</button></div>
   </div>
 </div>
@@ -930,6 +936,64 @@ $('#abData').addEventListener('click', () => open('#mData'));
 $('#abTools').addEventListener('click', () => {
   $('#bmlet').href = `javascript:window.open('${location.origin}/?add='+encodeURIComponent(location.href)+'&t='+encodeURIComponent(document.title),'_blank')`;
   open('#mTools');
+});
+
+/* ---------------- liveness probe ---------------- */
+$('#probeGo').addEventListener('click', async () => {
+  const btn = $('#probeGo');
+  const prog = $('#probeProg'), box = $('#probeResults');
+  const items = [];
+  for (const s of S.cfg.sections) for (const l of s.links) items.push({ id: l.id, url: l.url, name: l.name, sec: s.title, secId: s.id });
+  if (!items.length) { toast(T('没有可检测的链接', 'No links to check')); return; }
+  btn.disabled = true; box.innerHTML = '';
+  const byId = new Map(items.map((i) => [i.id, i]));
+  let alive = 0; const dead = [], unknown = [];
+  let done = 0;
+  for (let i = 0; i < items.length; i += 25) {
+    const batch = items.slice(i, i + 25);
+    try {
+      const r = await fetch('/api/probe', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ items: batch.map(({ id, url }) => ({ id, url })) }) });
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      const d = await r.json();
+      const got = new Set();
+      for (const x of d.results || []) {
+        const meta = byId.get(x.id); if (!meta) continue;
+        got.add(x.id);
+        if (x.status === 'alive') alive++;
+        else if (x.status === 'dead') dead.push({ ...meta, code: x.code });
+        else unknown.push({ ...meta, code: x.code });
+      }
+      for (const it of batch) if (!got.has(it.id)) unknown.push(it);
+    } catch { for (const it of batch) unknown.push(it); }
+    done += batch.length;
+    prog.textContent = T(`测活中… ${done}/${items.length}`, `Checking… ${done}/${items.length}`);
+  }
+  prog.textContent = T(`测活完成：正常 ${alive} · 疑似失效 ${dead.length} · 无法判定 ${unknown.length}（共 ${items.length}）`,
+    `Done: ${alive} alive · ${dead.length} likely dead · ${unknown.length} unknown (of ${items.length})`);
+  const row = (m, withDel) => `<div class="prow" style="display:flex;align-items:center;gap:8px;padding:7px 2px;border-bottom:1px solid var(--border)">
+      <div style="flex:1;min-width:0">
+        <div style="font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(m.sec)} · ${esc(m.name)}${m.code ? ` <span style="color:var(--muted);font-weight:400">(${m.code})</span>` : ''}</div>
+        <div style="color:var(--muted);font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(m.url)}</div>
+      </div>
+      ${withDel ? `<button class="btn sm danger" data-del="${m.id}" data-sec="${m.secId}">删除</button>` : ''}
+    </div>`;
+  let html = '';
+  if (dead.length) html += `<p style="font-weight:700;margin:10px 0 2px">疑似失效（${dead.length}）</p>` + dead.map((m) => row(m, true)).join('');
+  if (unknown.length) html += `<details style="margin-top:10px"><summary style="cursor:pointer;font-weight:700">无法判定（${unknown.length}）— 点开看</summary>` + unknown.map((m) => row(m, false)).join('') + '</details>';
+  if (!dead.length && !unknown.length) html = `<p class="hint" style="margin-top:10px">全部正常，没有失效链接 🎉</p>`;
+  box.innerHTML = html;
+  btn.disabled = false;
+});
+$('#probeResults').addEventListener('click', async (e) => {
+  const b = e.target.closest('[data-del]');
+  if (!b) return;
+  const sec = S.cfg.sections.find((s) => s.id === b.dataset.sec);
+  if (!sec) return;
+  const idx = sec.links.findIndex((l) => l.id === b.dataset.del);
+  if (idx < 0) return;
+  const [gone] = sec.links.splice(idx, 1);
+  if (await save(true)) { b.closest('.prow').remove(); render(); toast(T(`已删除：${gone.name}`, `Deleted: ${gone.name}`)); }
+  else { sec.links.splice(idx, 0, gone); toast(T('删除失败，已恢复', 'Delete failed, restored')); }
 });
 $('#abPwd').addEventListener('click', () => { $('#pwdOld').value = ''; $('#pwdNew').value = ''; open('#mPwd'); });
 $('#pwdGo').addEventListener('click', async () => {
