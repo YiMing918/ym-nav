@@ -103,6 +103,21 @@
   .tile .nm{font-size:14.5px; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
   body.nf-wrap .tile .nm{white-space:normal; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; line-height:1.3; word-break:break-all}
   .tile .nm.fit2{white-space:normal; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; line-height:1.3; word-break:break-all; font-size:11.5px}
+  /* vertical tiles: icon / name / domain, centered */
+  .grid.vt{gap:9px}
+  @media(max-width:640px){ .grid.vt{grid-template-columns:repeat(4,1fr)} }
+  @media(min-width:641px){ .grid.vt{grid-template-columns:repeat(6,1fr)} }
+  .tile.v{flex-direction:column; align-items:center; text-align:center; padding:13px 5px 10px; gap:0; -webkit-touch-callout:none}
+  .tile.v .ic{width:46px; height:46px; border-radius:13px; margin-bottom:7px}
+  .tile.v .ic img{width:27px; height:27px}
+  .tile.v .ic i{font-size:21px}
+  .tile.v .tx{min-width:0; width:100%}
+  .tile.v .nm{font-size:12.5px}
+  .tile.v .dm{font-size:10px; color:var(--muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; margin-top:1px}
+  /* long-press description popover */
+  #descPop{position:fixed; z-index:120; width:250px; background:var(--card); color:var(--text); border:1px solid var(--line); border-radius:13px; box-shadow:0 14px 34px rgba(2,6,23,.30); padding:11px 13px; font-size:12.5px; line-height:1.55}
+  #descPop .t{font-weight:700; font-size:13.5px}
+  #descPop .u{color:var(--muted); font-size:11px; word-break:break-all; margin-bottom:3px}
   .tile .sb{font-size:11.5px; color:var(--muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; margin-top:2px}
   .tile.textonly{justify-content:center; text-align:center; padding:14px 8px}
   .badge{position:absolute; top:-7px; right:8px; font-size:10.5px; font-weight:700; padding:2px 8px; border-radius:999px; line-height:1.5}
@@ -244,6 +259,7 @@
     <div class="fld"><label>网站名称</label><input type="text" id="fName" placeholder="如：哔哩哔哩"></div>
     <div class="fld"><label>英文名称（可空）</label><input type="text" id="fNameEn" placeholder="Bilibili"></div>
     <div class="fld"><label>网址</label><input type="url" id="fUrl" placeholder="https://…"></div>
+    <div class="fld"><label>网站描述（选填，长按卡片时显示）</label><input type="text" id="fDesc" placeholder="这个站是干什么的，一句话"></div>
     <div class="fld"><div class="row">
       <div><label>可达性徽标</label><select id="fBadge">
         <option value="">无徽标</option><option value="local">本地（直连可达）</option><option value="proxy">挂梯（需代理）</option>
@@ -381,6 +397,7 @@
   </div>
 </div>
 
+<div id="descPop" hidden></div>
 <div id="toast"></div>
 
 <script>
@@ -535,7 +552,10 @@ function tileHtml(l, sec) {
   if (sec.linkStyle === 'text') {
     return `<a class="tile textonly" href="${esc(l.url)}"${target} data-id="${esc(l.id)}" data-sec="${esc(sec.id)}">${badgeHtml(l)}<div class="tx"><div class="nm">${esc(linkName(l))}${lock}</div></div>${acts}</a>`;
   }
-  return `<a class="tile" href="${esc(l.url)}"${target} data-id="${esc(l.id)}" data-sec="${esc(sec.id)}">${badgeHtml(l)}${iconHtml(l, sec)}<div class="tx"><div class="nm">${esc(linkName(l))}${lock}</div><div class="sb">${esc(sub)}</div></div>${acts}</a>`;
+  if (sec.layout === 'wide') {
+    return `<a class="tile" href="${esc(l.url)}"${target} data-id="${esc(l.id)}" data-sec="${esc(sec.id)}">${badgeHtml(l)}${iconHtml(l, sec)}<div class="tx"><div class="nm">${esc(linkName(l))}${lock}</div><div class="sb">${esc(sub)}</div></div>${acts}</a>`;
+  }
+  return `<a class="tile v" href="${esc(l.url)}"${target} data-id="${esc(l.id)}" data-sec="${esc(sec.id)}">${badgeHtml(l)}${iconHtml(l, sec)}<div class="tx"><div class="nm">${esc(linkName(l))}${lock}</div><div class="dm">${esc(hostOf(l.url))}</div></div>${acts}</a>`;
 }
 function matches(l) {
   if (!S.query) return true;
@@ -550,12 +570,12 @@ function render() {
   const st = S.cfg.settings || {};
   // category menu (top-left 分类 button dropdown)
   $('#catBtnTx').textContent = T('分类', 'Categories');
-  let menu = `<button class="cmitem" data-jump="top"><span class="dot" style="background:#6366f1"><i class="fa-solid fa-border-all"></i></span>${T('全部（回到顶部）', 'All (back to top)')}<span class="cnt">${secs.reduce((a, s) => a + (s.links || []).length, 0)}</span></button>`;
+  let menu = `<button class="cmitem" data-jump="top"><span class="dot" style="background:#6366f1"><i class="fa-solid fa-border-all"></i></span>${T('全部', 'All')}<span class="cnt">${secs.reduce((a, s) => a + (s.links || []).length, 0)}</span></button>`;
   for (const s of secs) menu += `<button class="cmitem" data-jump="${esc(s.id)}"><span class="dot" style="background:${esc(s.accent || '#6366f1')}"><i class="${esc(s.icon || 'fa-solid fa-folder')}"></i></span>${esc(secName(s))}${s.private ? ' <i class="fa-solid fa-lock" style="color:var(--muted);font-size:11px"></i>' : ''}<span class="cnt">${(s.links || []).length}</span></button>`;
   $('#catMenu').innerHTML = menu;
   // frequent
   let html = '';
-  if (st.showFrequent !== false && !S.query) {
+  if (st.showFrequent !== false && !S.query && (!S.view || S.view === 'all')) {
     const top = allLinks().filter(([l]) => (S.clicks[l.id] || 0) > 0)
       .sort((a, b) => (S.clicks[b[0].id] || 0) - (S.clicks[a[0].id] || 0)).slice(0, 12);
     if (top.length >= 3) {
@@ -564,11 +584,12 @@ function render() {
     }
   }
   let total = 0;
-  for (const s of secs) {
+  const viewSecs = (S.view && S.view !== 'all' && !S.query) ? secs.filter((s) => s.id === S.view) : secs;
+  for (const s of viewSecs) {
     const links = (s.links || []).filter(matches);
     if (S.query && !links.length) continue;
     total += links.length;
-    html += `<section class="blk" id="sec-${esc(s.id)}"><div class="blkhead"><span class="dot" style="background:${esc(s.accent || '#6366f1')}"><i class="${esc(s.icon || 'fa-solid fa-folder')}"></i></span><h2>${esc(secName(s))}</h2>${s.private ? '<i class="fa-solid fa-lock" style="color:var(--muted);font-size:12px"></i>' : ''}<span class="cnt">${links.length}</span><span class="sp"></span>${S.edit ? `<button class="mini" data-addto="${esc(s.id)}">＋ ${T('加网站', 'Add')}</button>` : ''}</div><div class="grid ${s.layout === 'wide' ? 'wide' : ''}">${links.map((l) => tileHtml(l, s)).join('')}</div></section>`;
+    html += `<section class="blk" id="sec-${esc(s.id)}"><div class="blkhead"><span class="dot" style="background:${esc(s.accent || '#6366f1')}"><i class="${esc(s.icon || 'fa-solid fa-folder')}"></i></span><h2>${esc(secName(s))}</h2>${s.private ? '<i class="fa-solid fa-lock" style="color:var(--muted);font-size:12px"></i>' : ''}<span class="cnt">${links.length}</span><span class="sp"></span>${S.edit ? `<button class="mini" data-addto="${esc(s.id)}">＋ ${T('加网站', 'Add')}</button>` : ''}</div><div class="grid ${s.layout === 'wide' ? 'wide' : 'vt'}">${links.map((l) => tileHtml(l, s)).join('')}</div></section>`;
   }
   if (!secs.length) html = `<div class="empty">${T('还没有任何收藏。双击上方站名登录后，在「数据」里导入备份，或逐个添加。', 'No bookmarks yet. Double-click the site name to log in, then import or add.')}</div>`;
   else if (S.query && !total) html = `<div class="empty">${T('站内没有找到，试试用上面的搜索引擎搜全网。', 'Not found locally. Try a web engine above.')}</div>`;
@@ -676,9 +697,9 @@ document.addEventListener('click', (e) => {
 $('#catMenu').addEventListener('click', (e) => {
   const item = e.target.closest('[data-jump]'); if (!item) return;
   $('#catMenu').hidden = true;
-  if (item.dataset.jump === 'top') { scrollTo({ top: 0, behavior: 'smooth' }); return; }
-  const el = document.getElementById('sec-' + item.dataset.jump);
-  if (el) el.scrollIntoView({ behavior: 'smooth' });
+  S.view = item.dataset.jump === 'top' ? 'all' : item.dataset.jump;
+  render();
+  scrollTo({ top: 0 });
 });
 $('#main').addEventListener('click', (e) => {
   const addBtn = e.target.closest('[data-addto]');
@@ -763,6 +784,7 @@ function openLinkEditor(secId, linkId, prefill) {
   $('#fName').value = link ? link.name : (prefill ? prefill.t : '');
   $('#fNameEn').value = link ? (link.nameEn || '') : '';
   $('#fUrl').value = link ? link.url : (prefill ? prefill.url : '');
+  $('#fDesc').value = link ? (link.desc || '') : '';
   $('#fBadge').value = link ? (link.badge || '') : '';
   $('#fPrivate').checked = link ? !!link.private : false;
   $('#fIcon').value = link ? (link.icon || '') : '';
@@ -776,14 +798,15 @@ $('#linkSave').addEventListener('click', async () => {
   let url = $('#fUrl').value.trim();
   if (!name || !url) { toast(T('名称和网址都要填', 'Name and URL required')); return; }
   if (!/^https?:\/\//i.test(url)) url = 'https://' + url;
-  const data = { name, nameEn: $('#fNameEn').value.trim(), url, badge: $('#fBadge').value, icon: $('#fIcon').value.trim(), color: $('#fColor').value.trim(), private: $('#fPrivate').checked };
+  const data = { name, nameEn: $('#fNameEn').value.trim(), url, desc: $('#fDesc').value.trim(), badge: $('#fBadge').value, icon: $('#fIcon').value.trim(), color: $('#fColor').value.trim(), private: $('#fPrivate').checked };
   const targetSec = S.cfg.sections.find((s) => s.id === editCtx.secId);
   if (editCtx.linkId) {
     const fromSec = S.cfg.sections.find((s) => s.links.some((l) => l.id === editCtx.linkId));
     const i = fromSec.links.findIndex((l) => l.id === editCtx.linkId);
     const [link] = fromSec.links.splice(i, 1);
     Object.assign(link, data);
-    targetSec.links.push(link);
+    if (targetSec === fromSec) targetSec.links.splice(i, 0, link); // editing in place keeps position
+    else targetSec.links.push(link);
   } else {
     targetSec.links.push({ id: uid('link_'), ...data });
   }
@@ -1154,6 +1177,34 @@ $('#themeBtn').addEventListener('click', () => {
   const cur = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark';
   document.documentElement.dataset.theme = cur; localStorage.setItem('ymnav_theme', cur);
 });
+
+/* ---------------- long-press description ---------------- */
+let lpTimer = null, lpShown = false;
+function hideDescPop() { const p = $('#descPop'); if (p) p.hidden = true; }
+function showDescPop(a, l) {
+  const p = $('#descPop'); if (!p) return;
+  p.innerHTML = `<div class="t">${esc(linkName(l))}</div><div class="u">${esc(l.url)}</div><div>${esc(l.desc)}</div>`;
+  p.hidden = false;
+  const r = a.getBoundingClientRect();
+  const w = 250;
+  let x = Math.min(Math.max(8, r.left + r.width / 2 - w / 2), innerWidth - w - 8);
+  let y = r.bottom + 8;
+  if (y + 130 > innerHeight) y = Math.max(8, r.top - 138);
+  p.style.left = x + 'px'; p.style.top = y + 'px';
+}
+document.addEventListener('pointerdown', (e) => {
+  if (S.edit) return;
+  const a = e.target.closest('a.tile'); if (!a || !a.dataset.id) return;
+  const found = allLinks().find(([l]) => l.id === a.dataset.id);
+  if (!found || !found[0].desc) return;
+  lpTimer = setTimeout(() => { lpShown = true; showDescPop(a, found[0]); }, 550);
+});
+['pointerup', 'pointercancel', 'pointermove', 'scroll'].forEach((ev) => document.addEventListener(ev, () => { if (lpTimer) { clearTimeout(lpTimer); lpTimer = null; } }, { passive: true }));
+document.addEventListener('contextmenu', (e) => { if (e.target.closest('a.tile')) e.preventDefault(); });
+document.addEventListener('click', (e) => {
+  if (lpShown) { e.preventDefault(); e.stopPropagation(); lpShown = false; setTimeout(hideDescPop, 1200); }
+  else if (!e.target.closest('#descPop')) hideDescPop();
+}, true);
 
 /* ---------------- boot ---------------- */
 (async () => {
