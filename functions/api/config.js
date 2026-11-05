@@ -5,8 +5,8 @@ import { json, getAdmin, isAuthed } from '../_auth.js';
 const DEFAULT_CONFIG = {
   version: 1,
   settings: {
-    siteName: '科技共享',
-    siteNameEn: 'Tech Share',
+    siteName: '我的导航',
+    siteNameEn: 'My Nav',
     wallpaper: '',
     theme: 'auto',
     colsDesktop: 5,
