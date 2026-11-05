@@ -101,6 +101,8 @@
   .tile .ic .letter{font-weight:700; font-size:17px}
   .tile .tx{min-width:0; flex:1}
   .tile .nm{font-size:14.5px; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+  body.nf-wrap .tile .nm{white-space:normal; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; line-height:1.3; word-break:break-all}
+  .tile .nm.fit2{white-space:normal; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; line-height:1.3; word-break:break-all; font-size:11.5px}
   .tile .sb{font-size:11.5px; color:var(--muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; margin-top:2px}
   .tile.textonly{justify-content:center; text-align:center; padding:14px 8px}
   .badge{position:absolute; top:-7px; right:8px; font-size:10.5px; font-weight:700; padding:2px 8px; border-radius:999px; line-height:1.5}
@@ -318,6 +320,8 @@
       <select id="setWpText"><option value="auto">自动（按背景明暗）</option><option value="light">浅色</option><option value="dark">深色</option></select></div>
     <div class="swrow"><span>桌面每行卡片数</span><input type="number" id="setColsD" min="2" max="8"></div>
     <div class="swrow"><span>手机每行卡片数</span><input type="number" id="setColsM" min="2" max="5"></div>
+    <div class="swrow"><span>网站名称显示</span>
+      <select id="setNameFit"><option value="auto">自动（缩字适配）</option><option value="wrap">两行显示</option><option value="ellipsis">单行省略</option></select></div>
     <div class="swrow"><span>显示「常去」自动区</span><input type="checkbox" id="setFreq"></div>
     <div class="swrow"><span>新标签页打开网站</span><input type="checkbox" id="setNewTab"></div>
     <div class="btns"><button class="btn" id="setSave">保存设置</button>
@@ -482,6 +486,24 @@ async function applyWpTextMode(st) {
   setWpTextClass(b == null ? 'dark' : (b < 0.5 ? 'light' : 'dark'));
 }
 
+/* ---------------- link name fit ---------------- */
+function applyNameFit() {
+  const mode = (S.cfg.settings || {}).nameFit || 'auto';
+  document.body.classList.toggle('nf-wrap', mode === 'wrap');
+  const els = [...document.querySelectorAll('#main .tile .nm, #favs .tile .nm')];
+  for (const el of els) { el.style.fontSize = ''; el.classList.remove('fit2'); }
+  if (mode !== 'auto') return;
+  const jobs = [];
+  for (const el of els) {
+    const w = el.clientWidth, sw = el.scrollWidth;
+    if (w > 0 && sw > w) {
+      const fs = 14.5 * w / sw;
+      jobs.push([el, fs >= 11.5 ? fs : 0]); // 0 = switch this name to two-line display
+    }
+  }
+  for (const [el, fs] of jobs) { if (fs) el.style.fontSize = fs.toFixed(1) + 'px'; else el.classList.add('fit2'); }
+}
+
 /* ---------------- render ---------------- */
 function linkName(l) { return S.lang === 'en' ? (l.nameEn || l.name) : l.name; }
 function secName(s) { return S.lang === 'en' ? (s.titleEn || s.title) : s.title; }
@@ -553,6 +575,7 @@ function render() {
   $('#main').innerHTML = html;
   const all = allLinks().length;
   $('#statLine').textContent = T(`共 ${all} 个网站 · ${secs.length} 个分类`, `${all} sites · ${secs.length} categories`);
+  applyNameFit();
   $('#searchHint').textContent = S.query ? T(`站内找到 ${total} 条`, `${total} found`) : '';
   $('#adminbar').classList.toggle('show', S.authed);
   $('#abEdit').classList.toggle('on', S.edit);
@@ -866,6 +889,7 @@ $('#abSettings').addEventListener('click', () => {
   $('#setOverlay').value = st.overlay == null ? 50 : st.overlay; $('#ovVal').textContent = $('#setOverlay').value + '%';
   $('#setWpText').value = st.wpText || 'auto';
   $('#setColsD').value = st.colsDesktop || 5; $('#setColsM').value = st.colsMobile || 3;
+  $('#setNameFit').value = st.nameFit || 'auto';
   $('#setFreq').checked = st.showFrequent !== false; $('#setNewTab').checked = st.openInNewTab !== false;
   open('#mSettings');
 });
@@ -877,7 +901,7 @@ $('#setSave').addEventListener('click', async () => {
   st.siteName = $('#setName').value.trim() || st.siteName; st.siteNameEn = $('#setNameEn').value.trim();
   if (!st.siteNameEn && st.siteName) { const t = await translateName(st.siteName); if (t) st.siteNameEn = t; }
   st.wallpaper = $('#setWallpaper').value.trim(); st.theme = $('#setTheme').value; st.overlay = +$('#setOverlay').value; st.wpText = $('#setWpText').value;
-  st.colsDesktop = +$('#setColsD').value || 5; st.colsMobile = +$('#setColsM').value || 3;
+  st.colsDesktop = +$('#setColsD').value || 5; st.colsMobile = +$('#setColsM').value || 3; st.nameFit = $('#setNameFit').value;
   st.showFrequent = $('#setFreq').checked; st.openInNewTab = $('#setNewTab').checked;
   localStorage.removeItem('ymnav_theme');
   $('#mSettings').classList.remove('open');
