@@ -1,0 +1,892 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>科技共享</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🧭</text></svg>">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+<style>
+  :root{
+    --cd:5; --cdw:3; --cm:3; --cmw:2;
+    --bg:#f4f5fb; --bg2:#eef0f9; --card:#ffffff; --card-hover:#f8f9ff;
+    --text:#1e2430; --muted:#7a8194; --border:#e4e6f0;
+    --accent:#6366f1; --accent-soft:rgba(99,102,241,.12);
+    --green:#16a34a; --green-bg:rgba(22,163,74,.12);
+    --orange:#ea580c; --orange-bg:rgba(234,88,12,.12);
+    --shadow:0 1px 3px rgba(30,36,48,.06),0 4px 14px rgba(30,36,48,.05);
+    --radius:14px;
+  }
+  [data-theme="dark"]{
+    --bg:#12141d; --bg2:#171926; --card:#1d2030; --card-hover:#23263a;
+    --text:#e8eaf2; --muted:#8b90a5; --border:#2b2e44;
+    --accent-soft:rgba(99,102,241,.22);
+    --shadow:0 1px 3px rgba(0,0,0,.35),0 4px 14px rgba(0,0,0,.3);
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent}
+  html{scroll-behavior:smooth}
+  body{margin:0; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
+    background:var(--bg); color:var(--text); min-height:100vh;}
+  #bgimg{position:fixed; inset:0; background-size:cover; background-position:center; z-index:-2; display:none}
+  #bgimg::after{content:''; position:absolute; inset:0; background:var(--bg); opacity:.82}
+  a{color:inherit; text-decoration:none}
+  button{font-family:inherit; cursor:pointer}
+  input,select,textarea{font-family:inherit; font-size:14px; color:var(--text)}
+
+  /* ---------- header ---------- */
+  header{max-width:1180px; margin:0 auto; padding:26px 16px 6px;}
+  .toprow{display:flex; align-items:flex-end; justify-content:space-between; gap:12px; flex-wrap:wrap}
+  .brand h1{margin:0; font-size:27px; font-weight:800; letter-spacing:.5px}
+  .brand .sub{color:var(--muted); font-size:13px; margin-top:3px}
+  .clockbox{text-align:right; color:var(--muted); font-size:13px; line-height:1.5}
+  .clockbox .clock{font-size:21px; font-weight:700; color:var(--text); font-variant-numeric:tabular-nums}
+  .toolbar{display:flex; gap:8px; margin-top:12px; flex-wrap:wrap; align-items:center}
+  .tbtn{border:1px solid var(--border); background:var(--card); color:var(--text);
+    border-radius:999px; padding:6px 13px; font-size:13px; box-shadow:var(--shadow)}
+  .tbtn:active{transform:scale(.97)}
+  .tbtn.on{background:var(--accent); color:#fff; border-color:var(--accent)}
+
+  /* ---------- search ---------- */
+  .searchwrap{max-width:1180px; margin:14px auto 0; padding:0 16px}
+  .searchbar{display:flex; gap:8px; background:var(--card); border:1px solid var(--border);
+    border-radius:999px; padding:6px 6px 6px 18px; box-shadow:var(--shadow); align-items:center}
+  .searchbar i{color:var(--muted)}
+  .searchbar input{flex:1; border:none; outline:none; background:transparent; font-size:16px; min-width:0}
+  .searchbar select{border:none; background:transparent; outline:none; color:var(--muted); font-size:13px; max-width:92px}
+  .searchbar .go{border:none; background:var(--accent); color:#fff; border-radius:999px; padding:9px 18px; font-size:14px}
+  .searchhint{color:var(--muted); font-size:12px; margin:8px 4px 0; min-height:15px}
+
+  /* ---------- chips ---------- */
+  .chips{max-width:1180px; margin:12px auto 0; padding:2px 16px; display:flex; gap:8px;
+    overflow-x:auto; scrollbar-width:none; position:sticky; top:0; z-index:30;
+    background:linear-gradient(var(--bg) 78%, transparent); padding-bottom:10px}
+  .chips::-webkit-scrollbar{display:none}
+  .chip{flex:0 0 auto; border:1px solid var(--border); background:var(--card); color:var(--text);
+    border-radius:999px; padding:6px 14px; font-size:13px; box-shadow:var(--shadow)}
+  .chip.on{background:var(--accent); color:#fff; border-color:var(--accent)}
+
+  /* ---------- sections ---------- */
+  main{max-width:1180px; margin:0 auto; padding:4px 16px 90px}
+  section.blk{margin-top:26px; scroll-margin-top:64px}
+  .blkhead{display:flex; align-items:center; gap:9px; margin:0 2px 12px}
+  .blkhead .dot{width:30px; height:30px; border-radius:9px; display:flex; align-items:center; justify-content:center;
+    color:#fff; font-size:14px; flex:0 0 auto}
+  .blkhead h2{margin:0; font-size:17px; font-weight:700}
+  .blkhead .cnt{color:var(--muted); font-size:12px}
+  .blkhead .sp{flex:1}
+  .mini{border:1px solid var(--border); background:var(--card); border-radius:8px; padding:4px 9px; font-size:12px; color:var(--muted)}
+  .grid{display:grid; gap:10px; grid-template-columns:repeat(var(--cd),1fr)}
+  .grid.wide{grid-template-columns:repeat(var(--cdw),1fr)}
+  @media (max-width:680px){
+    .grid{grid-template-columns:repeat(var(--cm),1fr)}
+    .grid.wide{grid-template-columns:repeat(var(--cmw),1fr)}
+    .brand h1{font-size:23px}
+  }
+  .tile{position:relative; display:flex; align-items:center; gap:11px; background:var(--card);
+    border:1px solid var(--border); border-radius:var(--radius); padding:11px 12px; box-shadow:var(--shadow);
+    transition:transform .12s, background .12s; min-width:0}
+  .tile:hover{background:var(--card-hover); transform:translateY(-1px)}
+  .tile .ic{width:40px; height:40px; border-radius:11px; flex:0 0 auto; display:flex; align-items:center;
+    justify-content:center; font-size:19px; overflow:hidden; background:var(--accent-soft)}
+  .tile .ic img{width:24px; height:24px}
+  .tile .ic .letter{font-weight:700; font-size:17px}
+  .tile .tx{min-width:0; flex:1}
+  .tile .nm{font-size:14.5px; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+  .tile .sb{font-size:11.5px; color:var(--muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; margin-top:2px}
+  .tile.textonly{justify-content:center; text-align:center; padding:14px 8px}
+  .badge{position:absolute; top:-7px; right:8px; font-size:10.5px; font-weight:700; padding:2px 8px; border-radius:999px; line-height:1.5}
+  .badge.local{background:var(--green-bg); color:var(--green); border:1px solid var(--green)}
+  .badge.proxy{background:var(--orange-bg); color:var(--orange); border:1px solid var(--orange)}
+  .tile .acts{position:absolute; right:6px; bottom:6px; display:none; gap:5px}
+  body.editing .tile .acts{display:flex}
+  .tile .acts button{border:1px solid var(--border); background:var(--card); border-radius:7px; width:24px; height:24px;
+    font-size:11px; color:var(--muted); padding:0}
+  .empty{color:var(--muted); text-align:center; padding:56px 20px; font-size:14px; line-height:2}
+  .freq-tag{font-size:10.5px; color:var(--muted)}
+
+  /* ---------- admin bar ---------- */
+  #adminbar{position:fixed; left:50%; transform:translateX(-50%); bottom:16px; z-index:60;
+    display:none; gap:6px; background:var(--card); border:1px solid var(--border); border-radius:999px;
+    padding:7px 9px; box-shadow:0 8px 30px rgba(0,0,0,.18); max-width:94vw; overflow-x:auto; scrollbar-width:none}
+  #adminbar::-webkit-scrollbar{display:none}
+  #adminbar.show{display:flex}
+  #adminbar button{flex:0 0 auto; border:none; background:transparent; color:var(--text);
+    border-radius:999px; padding:7px 12px; font-size:13px}
+  #adminbar button.on{background:var(--accent); color:#fff}
+  #adminbar button:active{background:var(--accent-soft)}
+
+  /* ---------- modals ---------- */
+  .mask{position:fixed; inset:0; background:rgba(10,12,20,.45); z-index:80; display:none;
+    align-items:flex-start; justify-content:center; overflow-y:auto; padding:26px 12px}
+  .mask.open{display:flex}
+  .modal{background:var(--card); border-radius:18px; width:100%; max-width:520px; padding:20px;
+    box-shadow:0 18px 50px rgba(0,0,0,.3); animation:pop .15s ease}
+  .modal.wide{max-width:640px}
+  @keyframes pop{from{transform:scale(.97); opacity:.6} to{transform:scale(1); opacity:1}}
+  .modal h3{margin:0 0 14px; font-size:17px}
+  .modal .x{float:right; border:none; background:transparent; font-size:17px; color:var(--muted)}
+  .fld{margin-bottom:12px}
+  .fld label{display:block; font-size:12.5px; color:var(--muted); margin-bottom:5px}
+  .fld input[type=text],.fld input[type=password],.fld input[type=url],.fld select,.fld textarea{
+    width:100%; border:1px solid var(--border); border-radius:10px; padding:9px 11px; background:var(--bg2); outline:none}
+  .fld input:focus,.fld select:focus,.fld textarea:focus{border-color:var(--accent)}
+  .fld .row{display:flex; gap:8px} .fld .row>*{flex:1}
+  .btns{display:flex; gap:8px; margin-top:16px; flex-wrap:wrap}
+  .btn{border:none; border-radius:10px; padding:10px 18px; font-size:14px; background:var(--accent); color:#fff}
+  .btn.ghost{background:var(--bg2); color:var(--text); border:1px solid var(--border)}
+  .btn.danger{background:#dc2626; color:#fff}
+  .btn.sm{padding:6px 12px; font-size:13px}
+  .hint{font-size:12px; color:var(--muted); line-height:1.7}
+  .listrow{display:flex; align-items:center; gap:8px; padding:8px 6px; border-bottom:1px solid var(--border); font-size:14px}
+  .listrow .grow{flex:1; min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+  .listrow button{border:1px solid var(--border); background:var(--bg2); border-radius:7px; width:28px; height:28px; font-size:12px; color:var(--muted); flex:0 0 auto}
+  .swrow{display:flex; align-items:center; justify-content:space-between; padding:9px 2px; border-bottom:1px solid var(--border); font-size:14px}
+  .swrow input[type=number]{width:70px; border:1px solid var(--border); border-radius:8px; padding:6px 8px; background:var(--bg2)}
+  #toast{position:fixed; left:50%; bottom:86px; transform:translateX(-50%) translateY(20px); z-index:99;
+    background:#22263a; color:#fff; padding:10px 20px; border-radius:999px; font-size:14px; opacity:0;
+    pointer-events:none; transition:.25s; max-width:90vw; text-align:center}
+  #toast.show{opacity:1; transform:translateX(-50%) translateY(0)}
+  footer{max-width:1180px; margin:0 auto; padding:0 16px 34px; color:var(--muted); font-size:12.5px; text-align:center}
+  .bmlet{display:inline-block; background:var(--accent); color:#fff !important; border-radius:10px; padding:10px 18px; font-size:14px; font-weight:600}
+</style>
+</head>
+<body>
+<div id="bgimg"></div>
+
+<header>
+  <div class="toprow">
+    <div class="brand">
+      <h1 id="siteName">科技共享</h1>
+      <div class="sub" id="greetLine">愿你每次出发，都直达。</div>
+    </div>
+    <div class="clockbox">
+      <div class="clock" id="clock">--:--:--</div>
+      <div id="dateLine"></div>
+      <div id="weatherLine"></div>
+    </div>
+  </div>
+  <div class="toolbar">
+    <button class="tbtn" id="langBtn">EN</button>
+    <button class="tbtn" id="themeBtn"><i class="fa-solid fa-circle-half-stroke"></i></button>
+    <button class="tbtn" id="adminBtn"><i class="fa-solid fa-gear"></i> <span data-i18n="admin">管理</span></button>
+    <span style="flex:1"></span>
+    <span class="hint" id="statLine"></span>
+  </div>
+</header>
+
+<div class="searchwrap">
+  <div class="searchbar">
+    <i class="fa-solid fa-magnifying-glass"></i>
+    <input id="q" type="text" autocomplete="off" placeholder="搜索站内收藏，或选搜索引擎后回车…">
+    <select id="engine">
+      <option value="site">站内</option>
+      <option value="baidu">百度</option>
+      <option value="google">Google</option>
+      <option value="bing">Bing</option>
+      <option value="github">GitHub</option>
+    </select>
+    <button class="go" id="goBtn">搜索</button>
+  </div>
+  <div class="searchhint" id="searchHint"></div>
+</div>
+
+<nav class="chips" id="chips"></nav>
+<main id="main"></main>
+
+<footer id="siteFooter">
+  <span id="footText">科技共享 · YM Nav</span>
+  <span id="footHint"> · 双击这里进后台</span>
+</footer>
+
+<div id="adminbar">
+  <button id="abEdit"><i class="fa-solid fa-pen"></i> 编辑</button>
+  <button id="abAdd"><i class="fa-solid fa-plus"></i> 加网站</button>
+  <button id="abSections"><i class="fa-solid fa-layer-group"></i> 分类</button>
+  <button id="abSettings"><i class="fa-solid fa-sliders"></i> 设置</button>
+  <button id="abData"><i class="fa-solid fa-database"></i> 数据</button>
+  <button id="abTools"><i class="fa-solid fa-screwdriver-wrench"></i> 工具</button>
+  <button id="abPwd"><i class="fa-solid fa-key"></i> 改密码</button>
+  <button id="abLogout"><i class="fa-solid fa-right-from-bracket"></i> 退出</button>
+</div>
+
+<!-- login / setup -->
+<div class="mask" id="mLogin">
+  <div class="modal">
+    <button class="x" data-close>✕</button>
+    <h3 id="loginTitle">管理员登录</h3>
+    <div class="fld"><label id="loginUserLabel">账号</label>
+      <input type="text" id="loginUser" autocomplete="username"></div>
+    <div class="fld"><label id="loginLabel">密码</label>
+      <input type="password" id="loginPwd" autocomplete="current-password"></div>
+    <div class="hint" id="loginHint"></div>
+    <div class="btns"><button class="btn" id="loginGo">登录</button>
+      <button class="btn ghost" data-close>取消</button></div>
+  </div>
+</div>
+
+<!-- link editor -->
+<div class="mask" id="mLink">
+  <div class="modal">
+    <button class="x" data-close>✕</button>
+    <h3 id="linkTitle">添加网站</h3>
+    <div class="fld"><label>所属分类</label><select id="fSection"></select></div>
+    <div class="fld"><label>网站名称</label><input type="text" id="fName" placeholder="如：哔哩哔哩"></div>
+    <div class="fld"><label>英文名称（可空）</label><input type="text" id="fNameEn" placeholder="Bilibili"></div>
+    <div class="fld"><label>网址</label><input type="url" id="fUrl" placeholder="https://…"></div>
+    <div class="fld"><div class="row">
+      <div><label>可达性徽标</label><select id="fBadge">
+        <option value="">无徽标</option><option value="local">本地（直连可达）</option><option value="proxy">挂梯（需代理）</option>
+      </select></div>
+      <div><label>图标颜色（可空）</label><input type="text" id="fColor" placeholder="#6366f1"></div>
+    </div></div>
+    <div class="fld"><label>图标 class（可空，留空自动抓网站图标）</label>
+      <input type="text" id="fIcon" placeholder="如 fab fa-github"></div>
+    <div class="swrow"><span>私密网站（隐藏，登录后才可见）</span><input type="checkbox" id="fPrivate"></div>
+    <div class="btns"><button class="btn" id="linkSave">保存</button>
+      <button class="btn danger" id="linkDelete" style="display:none">删除</button>
+      <button class="btn ghost" data-close>取消</button></div>
+  </div>
+</div>
+
+<!-- section editor -->
+<div class="mask" id="mSection">
+  <div class="modal">
+    <button class="x" data-close>✕</button>
+    <h3 id="secTitle">编辑分类</h3>
+    <div class="fld"><label>分类名称</label><input type="text" id="sName"></div>
+    <div class="fld"><label>英文名称（可空）</label><input type="text" id="sNameEn"></div>
+    <div class="fld"><div class="row">
+      <div><label>图标 class</label><input type="text" id="sIcon" placeholder="fa-solid fa-star"></div>
+      <div><label>主题色</label><input type="text" id="sAccent" placeholder="#6366f1"></div>
+    </div></div>
+    <div class="fld"><div class="row">
+      <div><label>卡片布局</label><select id="sLayout">
+        <option value="card">标准卡片</option><option value="wide">宽卡片</option></select></div>
+      <div><label>链接样式</label><select id="sStyle">
+        <option value="icon">图标+名称</option><option value="text">纯文字</option></select></div>
+    </div></div>
+    <div class="swrow"><span>私密分类（隐藏，登录后才可见）</span><input type="checkbox" id="sPrivate"></div>
+    <div class="btns"><button class="btn" id="secSave">保存</button>
+      <button class="btn danger" id="secDelete" style="display:none">删除分类</button>
+      <button class="btn ghost" data-close>取消</button></div>
+  </div>
+</div>
+
+<!-- sections manager -->
+<div class="mask" id="mSections">
+  <div class="modal wide">
+    <button class="x" data-close>✕</button>
+    <h3>分类管理</h3>
+    <div id="secList"></div>
+    <div class="btns"><button class="btn" id="secAdd">＋ 新增分类</button>
+      <button class="btn ghost" data-close>关闭</button></div>
+  </div>
+</div>
+
+<!-- settings -->
+<div class="mask" id="mSettings">
+  <div class="modal">
+    <button class="x" data-close>✕</button>
+    <h3>站点设置</h3>
+    <div class="fld"><label>站点名称</label><input type="text" id="setName"></div>
+    <div class="fld"><label>站点英文名</label><input type="text" id="setNameEn"></div>
+    <div class="fld"><label>壁纸图片 URL（可空）</label><input type="url" id="setWallpaper" placeholder="https://…"></div>
+    <div class="swrow"><span>默认主题（自动=跟随系统）</span>
+      <select id="setTheme"><option value="auto">自动</option><option value="light">浅色</option><option value="dark">深色</option></select></div>
+    <div class="swrow"><span>桌面每行卡片数</span><input type="number" id="setColsD" min="2" max="8"></div>
+    <div class="swrow"><span>手机每行卡片数</span><input type="number" id="setColsM" min="2" max="5"></div>
+    <div class="swrow"><span>显示「常去」自动区</span><input type="checkbox" id="setFreq"></div>
+    <div class="swrow"><span>新标签页打开网站</span><input type="checkbox" id="setNewTab"></div>
+    <div class="btns"><button class="btn" id="setSave">保存设置</button>
+      <button class="btn ghost" data-close>取消</button></div>
+  </div>
+</div>
+
+<!-- data -->
+<div class="mask" id="mData">
+  <div class="modal wide">
+    <button class="x" data-close>✕</button>
+    <h3>数据管理</h3>
+    <p class="hint">导出备份，或从文件导入。JSON 导入会<b>整体替换</b>当前数据（导入前先导出一份更稳妥）；
+      CSV（区域，网站名称，英文名称，网址，徽标）和浏览器书签 HTML 是<b>追加合并</b>，同分类内网址相同自动跳过。</p>
+    <div class="btns">
+      <button class="btn sm" id="expJson">导出 JSON</button>
+      <button class="btn sm ghost" id="expCsv">导出 CSV</button>
+      <button class="btn sm ghost" id="expHtml">导出书签 HTML</button>
+    </div>
+    <div class="fld" style="margin-top:14px"><label>选择导入文件（.json / .csv / .html）</label>
+      <input type="file" id="impFile" accept=".json,.csv,.html,.htm"></div>
+    <div class="btns"><button class="btn" id="impGo">开始导入</button>
+      <button class="btn ghost" data-close>关闭</button></div>
+  </div>
+</div>
+
+<!-- tools -->
+<div class="mask" id="mTools">
+  <div class="modal">
+    <button class="x" data-close>✕</button>
+    <h3>小工具</h3>
+    <p class="hint">把下面这个按钮拖到浏览器收藏栏（手机可长按添加书签后把网址换成它）。
+      以后在任何网页点它，就能一键把当前页收藏进本站：</p>
+    <p style="text-align:center"><a class="bmlet" id="bmlet" href="#">＋ 收藏到本站</a></p>
+    <p class="hint">键盘快捷键：按 <b>/</b> 快速聚焦搜索框，<b>Esc</b> 清空搜索；
+      双击页面底部页脚也能进后台。</p>
+    <div class="btns"><button class="btn ghost" data-close>关闭</button></div>
+  </div>
+</div>
+
+<!-- change password -->
+<div class="mask" id="mPwd">
+  <div class="modal">
+    <button class="x" data-close>✕</button>
+    <h3>修改管理员密码</h3>
+    <div class="fld"><label>旧密码</label><input type="password" id="pwdOld"></div>
+    <div class="fld"><label>新密码（至少 4 位）</label><input type="password" id="pwdNew"></div>
+    <div class="btns"><button class="btn" id="pwdGo">确认修改</button>
+      <button class="btn ghost" data-close>取消</button></div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+'use strict';
+const $ = (s, el) => (el || document).querySelector(s);
+const $$ = (s, el) => [...(el || document).querySelectorAll(s)];
+const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const S = {
+  cfg: null, clicks: {}, authed: false, needsSetup: false,
+  lang: localStorage.getItem('ymnav_lang') || 'zh',
+  edit: false, query: '', pendingAdd: null,
+};
+const T = (zh, en) => (S.lang === 'en' ? en : zh);
+const uid = (p) => p + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+
+function toast(msg) {
+  const t = $('#toast'); t.textContent = msg; t.classList.add('show');
+  clearTimeout(t._h); t._h = setTimeout(() => t.classList.remove('show'), 2200);
+}
+function hostOf(u) { try { return new URL(u).hostname.replace(/^www\./, ''); } catch { return ''; } }
+
+/* ---------------- data ---------------- */
+async function load() {
+  try {
+    const r = await fetch('/api/config');
+    if (!r.ok) throw new Error(r.status);
+    const d = await r.json();
+    S.cfg = d.config; S.clicks = d.clicks || {}; S.authed = !!d.authed; S.needsSetup = !!d.needsSetup;
+    localStorage.setItem('ymnav_cache', JSON.stringify(S.cfg));
+  } catch (e) {
+    const cache = localStorage.getItem('ymnav_cache');
+    if (cache) { S.cfg = JSON.parse(cache); toast(T('网络异常，显示上次缓存', 'Offline, showing cache')); }
+    else { S.cfg = { version: 1, settings: {}, sections: [] }; }
+  }
+  if (!S.cfg.settings) S.cfg.settings = {};
+}
+async function save(silent) {
+  try {
+    const r = await fetch('/api/config', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(S.cfg) });
+    if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || r.status);
+    localStorage.setItem('ymnav_cache', JSON.stringify(S.cfg));
+    if (!silent) toast(T('已保存', 'Saved'));
+    return true;
+  } catch (e) { toast(T('保存失败：', 'Save failed: ') + e.message); return false; }
+}
+
+/* ---------------- settings / theme ---------------- */
+function applySettings() {
+  const st = S.cfg.settings || {};
+  const d = Math.min(8, Math.max(2, +st.colsDesktop || 5));
+  const m = Math.min(5, Math.max(2, +st.colsMobile || 3));
+  const r = document.documentElement.style;
+  r.setProperty('--cd', d); r.setProperty('--cdw', Math.max(1, Math.ceil(d / 2)));
+  r.setProperty('--cm', m); r.setProperty('--cmw', Math.max(1, Math.ceil(m / 2)));
+  document.title = st.siteName || '导航';
+  $('#siteName').textContent = S.lang === 'en' ? (st.siteNameEn || st.siteName || '') : (st.siteName || '');
+  $('#footText').textContent = (st.siteName || '') + ' · YM Nav';
+  const bg = $('#bgimg');
+  if (st.wallpaper) { bg.style.backgroundImage = `url("${st.wallpaper}")`; bg.style.display = 'block'; }
+  else { bg.style.display = 'none'; bg.style.backgroundImage = ''; }
+  let theme = localStorage.getItem('ymnav_theme') || st.theme || 'auto';
+  if (theme === 'auto') theme = matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+  document.documentElement.dataset.theme = theme;
+}
+
+/* ---------------- render ---------------- */
+function linkName(l) { return S.lang === 'en' ? (l.nameEn || l.name) : l.name; }
+function secName(s) { return S.lang === 'en' ? (s.titleEn || s.title) : s.title; }
+function badgeHtml(l) {
+  if (l.badge === 'local') return `<span class="badge local">${T('本地', 'Local')}</span>`;
+  if (l.badge === 'proxy') return `<span class="badge proxy">${T('挂梯', 'Proxy')}</span>`;
+  return '';
+}
+function iconHtml(l, sec) {
+  const color = l.color || sec.accent || '#6366f1';
+  if (l.icon) return `<div class="ic" style="color:${esc(color)}"><i class="${esc(l.icon)}"></i></div>`;
+  const host = hostOf(l.url);
+  const letter = esc((l.name || '?').trim().charAt(0) || '?');
+  return `<div class="ic" style="color:${esc(color)}"><img data-fav data-step="0" data-host="${esc(host)}" data-letter="${letter}" src="https://www.google.com/s2/favicons?domain=${encodeURIComponent(host)}&sz=128" alt="" loading="lazy"><span class="letter" style="display:none">${letter}</span></div>`;
+}
+document.addEventListener('error', (e) => {
+  const img = e.target;
+  if (!img || img.tagName !== 'IMG' || !img.dataset || img.dataset.fav === undefined) return;
+  const step = +img.dataset.step || 0;
+  if (step === 0 && img.dataset.host) { img.dataset.step = '1'; img.src = `https://${img.dataset.host}/favicon.ico`; }
+  else { img.style.display = 'none'; const s = img.parentNode && img.parentNode.querySelector('.letter'); if (s) s.style.display = ''; }
+}, true);
+
+function tileHtml(l, sec) {
+  const st = S.cfg.settings || {};
+  const target = st.openInNewTab === false ? '' : ' target="_blank" rel="noopener"';
+  const sub = S.lang === 'en' ? hostOf(l.url) : (l.nameEn || hostOf(l.url));
+  const acts = S.edit ? `<span class="acts"><button data-move="-1" title="前移">←</button><button data-move="1" title="后移">→</button></span>` : '';
+  const lock = l.private ? ' <i class="fa-solid fa-lock" style="color:var(--muted);font-size:11px"></i>' : '';
+  if (sec.linkStyle === 'text') {
+    return `<a class="tile textonly" href="${esc(l.url)}"${target} data-id="${esc(l.id)}" data-sec="${esc(sec.id)}">${badgeHtml(l)}<div class="tx"><div class="nm">${esc(linkName(l))}${lock}</div></div>${acts}</a>`;
+  }
+  return `<a class="tile" href="${esc(l.url)}"${target} data-id="${esc(l.id)}" data-sec="${esc(sec.id)}">${badgeHtml(l)}${iconHtml(l, sec)}<div class="tx"><div class="nm">${esc(linkName(l))}${lock}</div><div class="sb">${esc(sub)}</div></div>${acts}</a>`;
+}
+function matches(l) {
+  if (!S.query) return true;
+  const q = S.query.toLowerCase();
+  return (l.name || '').toLowerCase().includes(q) || (l.nameEn || '').toLowerCase().includes(q) || (l.url || '').toLowerCase().includes(q);
+}
+function allLinks() { return (S.cfg.sections || []).flatMap((s) => s.links.map((l) => [l, s])); }
+
+function render() {
+  applySettings();
+  const secs = S.cfg.sections || [];
+  const st = S.cfg.settings || {};
+  // chips
+  let chips = `<button class="chip" data-jump="top">${T('全部', 'All')}</button>`;
+  for (const s of secs) chips += `<button class="chip" data-jump="${esc(s.id)}">${esc(secName(s))}</button>`;
+  $('#chips').innerHTML = chips;
+  // frequent
+  let html = '';
+  if (st.showFrequent !== false && !S.query) {
+    const top = allLinks().filter(([l]) => (S.clicks[l.id] || 0) > 0)
+      .sort((a, b) => (S.clicks[b[0].id] || 0) - (S.clicks[a[0].id] || 0)).slice(0, 12);
+    if (top.length >= 3) {
+      const fs = { id: '__freq', title: '常去', titleEn: 'Frequent', icon: 'fa-solid fa-fire', accent: '#f59e0b', layout: 'card', linkStyle: 'icon' };
+      html += `<section class="blk" id="sec-__freq"><div class="blkhead"><span class="dot" style="background:#f59e0b"><i class="fa-solid fa-fire"></i></span><h2>${T('常去', 'Frequent')}</h2><span class="cnt">${T('按你的点击自动排', 'auto by your clicks')}</span></div><div class="grid">${top.map(([l, s]) => tileHtml(l, s)).join('')}</div></section>`;
+    }
+  }
+  let total = 0;
+  for (const s of secs) {
+    const links = (s.links || []).filter(matches);
+    if (S.query && !links.length) continue;
+    total += links.length;
+    html += `<section class="blk" id="sec-${esc(s.id)}"><div class="blkhead"><span class="dot" style="background:${esc(s.accent || '#6366f1')}"><i class="${esc(s.icon || 'fa-solid fa-folder')}"></i></span><h2>${esc(secName(s))}</h2>${s.private ? '<i class="fa-solid fa-lock" style="color:var(--muted);font-size:12px"></i>' : ''}<span class="cnt">${links.length}</span><span class="sp"></span>${S.edit ? `<button class="mini" data-addto="${esc(s.id)}">＋ ${T('加网站', 'Add')}</button>` : ''}</div><div class="grid ${s.layout === 'wide' ? 'wide' : ''}">${links.map((l) => tileHtml(l, s)).join('')}</div></section>`;
+  }
+  if (!secs.length) html = `<div class="empty">${T('还没有任何收藏。点右上角「管理」登录后，在「数据」里导入备份，或逐个添加。', 'No bookmarks yet. Log in via Manage to import or add.')}</div>`;
+  else if (S.query && !total) html = `<div class="empty">${T('站内没有找到，试试用上面的搜索引擎搜全网。', 'Not found locally. Try a web engine above.')}</div>`;
+  $('#main').innerHTML = html;
+  const all = allLinks().length;
+  $('#statLine').textContent = T(`共 ${all} 个网站 · ${secs.length} 个分类`, `${all} sites · ${secs.length} categories`);
+  $('#searchHint').textContent = S.query ? T(`站内找到 ${total} 条`, `${total} found`) : '';
+  $('#adminbar').classList.toggle('show', S.authed);
+  $('#abEdit').classList.toggle('on', S.edit);
+  document.body.classList.toggle('editing', S.edit);
+  $('#footHint').style.display = S.authed ? 'none' : '';
+}
+
+/* ---------------- clock / weather / greeting ---------------- */
+function tick() {
+  const now = new Date();
+  const p = (n) => String(n).padStart(2, '0');
+  $('#clock').textContent = `${p(now.getHours())}:${p(now.getMinutes())}:${p(now.getSeconds())}`;
+  const wk = ['日', '一', '二', '三', '四', '五', '六'][now.getDay()];
+  $('#dateLine').textContent = T(`${now.getFullYear()}年${now.getMonth() + 1}月${now.getDate()}日 星期${wk}`,
+    now.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric', weekday: 'short' }));
+  const h = now.getHours();
+  const g = h < 6 ? '夜深了' : h < 9 ? '早上好' : h < 12 ? '上午好' : h < 14 ? '中午好' : h < 18 ? '下午好' : '晚上好';
+  $('#greetLine').textContent = T(`${g}，愿你每次出发，都直达。`, 'Welcome back.');
+}
+function geoPosition() {
+  return new Promise((resolve) => {
+    if (!navigator.geolocation) return resolve(null);
+    navigator.geolocation.getCurrentPosition(
+      (p) => resolve({ lat: p.coords.latitude, lon: p.coords.longitude }),
+      () => resolve(null),
+      { timeout: 4000, maximumAge: 3600000 }
+    );
+  });
+}
+async function locate() {
+  // 1) browser/phone geolocation (one-time permission), city name via free reverse geocode
+  const g = await geoPosition();
+  if (g) {
+    let city = '本地';
+    try {
+      const rr = await fetch(`https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${g.lat}&longitude=${g.lon}&localityLanguage=zh`);
+      const dd = await rr.json();
+      city = dd.city || dd.locality || '本地';
+    } catch { /* keep default label */ }
+    return { ...g, city, ts: Date.now() };
+  }
+  // 2) IP-based location
+  try {
+    const r = await fetch('https://ipapi.co/json/');
+    const d = await r.json();
+    if (d && d.latitude) return { lat: d.latitude, lon: d.longitude, city: d.city || '本地', ts: Date.now() };
+  } catch { /* fall through */ }
+  // 3) last resort default
+  return { lat: 34.329, lon: 108.709, city: '咸阳', ts: Date.now() };
+}
+async function weather() {
+  try {
+    let loc = null;
+    try { loc = JSON.parse(localStorage.getItem('ymnav_loc') || 'null'); } catch { /* ignore */ }
+    if (!loc || Date.now() - (loc.ts || 0) > 24 * 3600 * 1000) {
+      loc = await locate();
+      try { localStorage.setItem('ymnav_loc', JSON.stringify(loc)); } catch { /* ignore */ }
+    }
+    if (!loc) return;
+    const r = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${loc.lat}&longitude=${loc.lon}&current=temperature_2m,weather_code&timezone=auto`);
+    const d = await r.json();
+    const code = d.current.weather_code;
+    const map = { 0: '晴', 1: '晴间多云', 2: '多云', 3: '阴', 45: '雾', 48: '雾', 51: '毛毛雨', 53: '毛毛雨', 55: '毛毛雨', 61: '小雨', 63: '中雨', 65: '大雨', 71: '小雪', 73: '中雪', 75: '大雪', 80: '阵雨', 81: '阵雨', 82: '暴雨', 95: '雷阵雨' };
+    $('#weatherLine').textContent = `${loc.city} ${Math.round(d.current.temperature_2m)}°C ${map[code] || ''}`;
+  } catch { /* silent */ }
+}
+
+/* ---------------- search ---------------- */
+const ENGINES = {
+  baidu: (q) => 'https://www.baidu.com/s?wd=' + encodeURIComponent(q),
+  google: (q) => 'https://www.google.com/search?q=' + encodeURIComponent(q),
+  bing: (q) => 'https://www.bing.com/search?q=' + encodeURIComponent(q),
+  github: (q) => 'https://github.com/search?q=' + encodeURIComponent(q),
+};
+function doSearch() {
+  const q = $('#q').value.trim();
+  const eng = $('#engine').value;
+  if (eng !== 'site' && q) { window.open(ENGINES[eng](q), '_blank'); return; }
+  S.query = q; render();
+}
+$('#q').addEventListener('input', () => { if ($('#engine').value === 'site') { S.query = $('#q').value.trim(); render(); } });
+$('#q').addEventListener('keydown', (e) => { if (e.key === 'Enter') doSearch(); });
+$('#goBtn').addEventListener('click', doSearch);
+document.addEventListener('keydown', (e) => {
+  if (e.key === '/' && !/INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName)) { e.preventDefault(); $('#q').focus(); }
+  if (e.key === 'Escape') { S.query = ''; $('#q').value = ''; render(); $$('.mask.open').forEach((m) => m.classList.remove('open')); }
+});
+
+/* ---------------- navigation / clicks ---------------- */
+$('#chips').addEventListener('click', (e) => {
+  const chip = e.target.closest('[data-jump]'); if (!chip) return;
+  if (chip.dataset.jump === 'top') { scrollTo({ top: 0, behavior: 'smooth' }); return; }
+  const el = document.getElementById('sec-' + chip.dataset.jump);
+  if (el) el.scrollIntoView({ behavior: 'smooth' });
+});
+$('#main').addEventListener('click', (e) => {
+  const addBtn = e.target.closest('[data-addto]');
+  if (addBtn) { openLinkEditor(addBtn.dataset.addto, null); return; }
+  const mv = e.target.closest('[data-move]');
+  const tile = e.target.closest('.tile');
+  if (mv && tile) {
+    e.preventDefault();
+    const sec = S.cfg.sections.find((s) => s.id === tile.dataset.sec);
+    const i = sec.links.findIndex((l) => l.id === tile.dataset.id);
+    const j = i + (+mv.dataset.move);
+    if (j >= 0 && j < sec.links.length) { [sec.links[i], sec.links[j]] = [sec.links[j], sec.links[i]]; save(true).then(render); }
+    return;
+  }
+  if (!tile) return;
+  if (S.edit) { e.preventDefault(); openLinkEditor(tile.dataset.sec, tile.dataset.id); return; }
+  const body = JSON.stringify({ id: tile.dataset.id });
+  if (navigator.sendBeacon) navigator.sendBeacon('/api/click', new Blob([body], { type: 'application/json' }));
+  else fetch('/api/click', { method: 'POST', body, keepalive: true }).catch(() => {});
+  S.clicks[tile.dataset.id] = (S.clicks[tile.dataset.id] || 0) + 1;
+});
+
+/* ---------------- modals ---------------- */
+function open(id) { $(id).classList.add('open'); }
+function close(el) { el.closest('.mask').classList.remove('open'); }
+$$('[data-close]').forEach((b) => b.addEventListener('click', () => close(b)));
+$$('.mask').forEach((m) => m.addEventListener('click', (e) => { if (e.target === m) m.classList.remove('open'); }));
+
+/* ---------------- auth ---------------- */
+function openLogin() {
+  $('#loginTitle').textContent = S.needsSetup ? T('首次设置管理员账号', 'Set admin account') : T('管理员登录', 'Admin login');
+  $('#loginUserLabel').textContent = S.needsSetup ? T('设置账号', 'New username') : T('账号', 'Username');
+  $('#loginLabel').textContent = S.needsSetup ? T('设置密码（至少 4 位，记牢，丢了只能进 KV 后台重置）', 'New password (min 4)') : T('密码', 'Password');
+  $('#loginHint').textContent = S.needsSetup ? T('这是新站第一次使用，先给后台设个账号和密码，设完自动登录。', 'First run: set the admin username and password.') : '';
+  $('#loginUser').value = localStorage.getItem('ymnav_user') || '';
+  $('#loginPwd').value = '';
+  open('#mLogin'); setTimeout(() => $('#loginPwd').focus(), 60);
+}
+$('#loginGo').addEventListener('click', async () => {
+  const pwd = $('#loginPwd').value;
+  const user = $('#loginUser').value.trim();
+  if (!pwd) return;
+  const url = S.needsSetup ? '/api/setup' : '/api/login';
+  try {
+    const r = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username: user, password: pwd }) });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(d.error || r.status);
+    S.authed = true; S.needsSetup = false;
+    if (user) localStorage.setItem('ymnav_user', user);
+    $('#mLogin').classList.remove('open');
+    toast(T('登录成功', 'Logged in'));
+    render();
+    if (S.pendingAdd) { const p = S.pendingAdd; S.pendingAdd = null; openLinkEditor(null, null, p); }
+  } catch (e) { toast(e.message === 'wrong credentials' ? T('账号或密码不对', 'Wrong username or password') : T('失败：', 'Failed: ') + e.message); }
+});
+$('#loginPwd').addEventListener('keydown', (e) => { if (e.key === 'Enter') $('#loginGo').click(); });
+$('#adminBtn').addEventListener('click', () => { if (S.authed) { $('#adminbar').scrollIntoView({ behavior: 'smooth', block: 'end' }); toast(T('已登录，用底部工具条管理', 'Logged in, use the bottom bar')); } else openLogin(); });
+$('#siteFooter').addEventListener('dblclick', () => { if (!S.authed) openLogin(); });
+$('#abLogout').addEventListener('click', async () => {
+  await fetch('/api/logout', { method: 'POST' }).catch(() => {});
+  S.authed = false; S.edit = false; render(); toast(T('已退出', 'Logged out'));
+});
+$('#abEdit').addEventListener('click', () => { S.edit = !S.edit; render(); toast(S.edit ? T('编辑模式：点卡片改内容，用卡片上的箭头调顺序', 'Edit mode on') : T('已退出编辑模式', 'Edit mode off')); });
+
+/* ---------------- link editor ---------------- */
+let editCtx = { secId: null, linkId: null };
+function fillSectionSelect(sel, val) {
+  sel.innerHTML = S.cfg.sections.map((s) => `<option value="${esc(s.id)}" ${s.id === val ? 'selected' : ''}>${esc(s.title)}</option>`).join('');
+}
+function openLinkEditor(secId, linkId, prefill) {
+  if (!S.cfg.sections.length) { toast(T('先建一个分类', 'Create a category first')); openSections(); return; }
+  editCtx = { secId: secId || S.cfg.sections[0].id, linkId: linkId || null };
+  const sec = S.cfg.sections.find((s) => s.id === editCtx.secId);
+  const link = linkId ? sec.links.find((l) => l.id === linkId) : null;
+  fillSectionSelect($('#fSection'), editCtx.secId);
+  $('#linkTitle').textContent = link ? T('编辑网站', 'Edit site') : T('添加网站', 'Add site');
+  $('#fName').value = link ? link.name : (prefill ? prefill.t : '');
+  $('#fNameEn').value = link ? (link.nameEn || '') : '';
+  $('#fUrl').value = link ? link.url : (prefill ? prefill.url : '');
+  $('#fBadge').value = link ? (link.badge || '') : '';
+  $('#fPrivate').checked = link ? !!link.private : false;
+  $('#fIcon').value = link ? (link.icon || '') : '';
+  $('#fColor').value = link ? (link.color || '') : '';
+  $('#linkDelete').style.display = link ? '' : 'none';
+  open('#mLink');
+}
+$('#fSection').addEventListener('change', () => { editCtx.secId = $('#fSection').value; });
+$('#linkSave').addEventListener('click', async () => {
+  const name = $('#fName').value.trim();
+  let url = $('#fUrl').value.trim();
+  if (!name || !url) { toast(T('名称和网址都要填', 'Name and URL required')); return; }
+  if (!/^https?:\/\//i.test(url)) url = 'https://' + url;
+  const data = { name, nameEn: $('#fNameEn').value.trim(), url, badge: $('#fBadge').value, icon: $('#fIcon').value.trim(), color: $('#fColor').value.trim(), private: $('#fPrivate').checked };
+  const targetSec = S.cfg.sections.find((s) => s.id === editCtx.secId);
+  if (editCtx.linkId) {
+    const fromSec = S.cfg.sections.find((s) => s.links.some((l) => l.id === editCtx.linkId));
+    const i = fromSec.links.findIndex((l) => l.id === editCtx.linkId);
+    const [link] = fromSec.links.splice(i, 1);
+    Object.assign(link, data);
+    targetSec.links.push(link);
+  } else {
+    targetSec.links.push({ id: uid('link_'), ...data });
+  }
+  $('#mLink').classList.remove('open');
+  if (await save(true)) { toast(T('已保存', 'Saved')); render(); }
+});
+$('#linkDelete').addEventListener('click', async () => {
+  const sec = S.cfg.sections.find((s) => s.id === editCtx.secId);
+  const link = sec.links.find((l) => l.id === editCtx.linkId);
+  if (!confirm(T(`删除「${link.name}」？`, `Delete "${link.name}"?`))) return;
+  sec.links = sec.links.filter((l) => l.id !== editCtx.linkId);
+  $('#mLink').classList.remove('open');
+  if (await save(true)) { toast(T('已删除', 'Deleted')); render(); }
+});
+$('#abAdd').addEventListener('click', () => openLinkEditor(null, null));
+
+/* ---------------- sections ---------------- */
+let secCtx = { id: null };
+function openSections() {
+  $('#secList').innerHTML = S.cfg.sections.map((s, i) => `<div class="listrow"><span class="dot" style="width:24px;height:24px;border-radius:7px;display:inline-flex;align-items:center;justify-content:center;color:#fff;font-size:12px;background:${esc(s.accent || '#6366f1')}"><i class="${esc(s.icon || 'fa-solid fa-folder')}"></i></span><span class="grow">${esc(s.title)}${s.private ? ' 🔒' : ''} <span class="freq-tag">${s.links.length}</span></span><button data-sact="up" data-i="${i}">↑</button><button data-sact="down" data-i="${i}">↓</button><button data-sact="edit" data-i="${i}">✎</button></div>`).join('') || `<p class="hint">${T('还没有分类', 'No categories')}</p>`;
+  open('#mSections');
+}
+$('#secList').addEventListener('click', async (e) => {
+  const b = e.target.closest('[data-sact]'); if (!b) return;
+  const i = +b.dataset.i, secs = S.cfg.sections;
+  if (b.dataset.sact === 'edit') { $('#mSections').classList.remove('open'); openSectionEditor(secs[i]); return; }
+  const j = b.dataset.sact === 'up' ? i - 1 : i + 1;
+  if (j < 0 || j >= secs.length) return;
+  [secs[i], secs[j]] = [secs[j], secs[i]];
+  if (await save(true)) { openSections(); render(); }
+});
+$('#abSections').addEventListener('click', openSections);
+$('#secAdd').addEventListener('click', () => { $('#mSections').classList.remove('open'); openSectionEditor(null); });
+function openSectionEditor(sec) {
+  secCtx = { id: sec ? sec.id : null };
+  $('#secTitle').textContent = sec ? T('编辑分类', 'Edit category') : T('新增分类', 'New category');
+  $('#sName').value = sec ? sec.title : '';
+  $('#sNameEn').value = sec ? (sec.titleEn || '') : '';
+  $('#sIcon').value = sec ? (sec.icon || '') : 'fa-solid fa-folder';
+  $('#sAccent').value = sec ? (sec.accent || '') : '#6366f1';
+  $('#sLayout').value = sec ? (sec.layout || 'card') : 'card';
+  $('#sStyle').value = sec ? (sec.linkStyle || 'icon') : 'icon';
+  $('#sPrivate').checked = sec ? !!sec.private : false;
+  $('#secDelete').style.display = sec ? '' : 'none';
+  open('#mSection');
+}
+$('#secSave').addEventListener('click', async () => {
+  const title = $('#sName').value.trim();
+  if (!title) { toast(T('分类名不能为空', 'Name required')); return; }
+  const data = { title, titleEn: $('#sNameEn').value.trim(), icon: $('#sIcon').value.trim() || 'fa-solid fa-folder', accent: $('#sAccent').value.trim() || '#6366f1', layout: $('#sLayout').value, linkStyle: $('#sStyle').value, private: $('#sPrivate').checked };
+  if (secCtx.id) { const sec = S.cfg.sections.find((s) => s.id === secCtx.id); Object.assign(sec, data); }
+  else S.cfg.sections.push({ id: uid('sec_'), links: [], ...data });
+  $('#mSection').classList.remove('open');
+  if (await save(true)) { toast(T('已保存', 'Saved')); render(); }
+});
+$('#secDelete').addEventListener('click', async () => {
+  const sec = S.cfg.sections.find((s) => s.id === secCtx.id);
+  if (!confirm(T(`删除分类「${sec.title}」及其 ${sec.links.length} 个网站？`, `Delete category "${sec.title}" and its ${sec.links.length} sites?`))) return;
+  S.cfg.sections = S.cfg.sections.filter((s) => s.id !== secCtx.id);
+  $('#mSection').classList.remove('open');
+  if (await save(true)) { toast(T('已删除', 'Deleted')); render(); }
+});
+
+/* ---------------- settings ---------------- */
+$('#abSettings').addEventListener('click', () => {
+  const st = S.cfg.settings || {};
+  $('#setName').value = st.siteName || ''; $('#setNameEn').value = st.siteNameEn || '';
+  $('#setWallpaper').value = st.wallpaper || ''; $('#setTheme').value = st.theme || 'auto';
+  $('#setColsD').value = st.colsDesktop || 5; $('#setColsM').value = st.colsMobile || 3;
+  $('#setFreq').checked = st.showFrequent !== false; $('#setNewTab').checked = st.openInNewTab !== false;
+  open('#mSettings');
+});
+$('#setSave').addEventListener('click', async () => {
+  const st = S.cfg.settings;
+  st.siteName = $('#setName').value.trim() || st.siteName; st.siteNameEn = $('#setNameEn').value.trim();
+  st.wallpaper = $('#setWallpaper').value.trim(); st.theme = $('#setTheme').value;
+  st.colsDesktop = +$('#setColsD').value || 5; st.colsMobile = +$('#setColsM').value || 3;
+  st.showFrequent = $('#setFreq').checked; st.openInNewTab = $('#setNewTab').checked;
+  localStorage.removeItem('ymnav_theme');
+  $('#mSettings').classList.remove('open');
+  if (await save(true)) { toast(T('设置已保存', 'Settings saved')); render(); }
+});
+
+/* ---------------- data import / export ---------------- */
+function download(name, text, type) {
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([text], { type: type || 'text/plain;charset=utf-8' }));
+  a.download = name; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+}
+const badgeText = (b) => (b === 'local' ? '本地' : b === 'proxy' ? '挂梯' : '');
+$('#expJson').addEventListener('click', () => download('ym-nav-backup.json', JSON.stringify(S.cfg, null, 2), 'application/json'));
+$('#expCsv').addEventListener('click', () => {
+  const q = (v) => `"${String(v ?? '').replace(/"/g, '""')}"`;
+  const rows = [['区域', '网站名称', '英文名称', '网址', '徽标'].join(',')];
+  for (const s of S.cfg.sections) for (const l of s.links) rows.push([s.title, l.name, l.nameEn || '', l.url, badgeText(l.badge)].map(q).join(','));
+  download('ym-nav.csv', '﻿' + rows.join('\r\n'), 'text/csv');
+});
+$('#expHtml').addEventListener('click', () => {
+  let h = '<!DOCTYPE NETSCAPE-Bookmark-file-1>\n<META HTTP-EQUIV="Content-Type" CONTENT="text/html; charset=UTF-8">\n<TITLE>Bookmarks</TITLE>\n<H1>Bookmarks</H1>\n<DL><p>\n';
+  for (const s of S.cfg.sections) {
+    h += `<DT><H3>${esc(s.title)}</H3>\n<DL><p>\n`;
+    for (const l of s.links) h += `<DT><A HREF="${esc(l.url)}">${esc(l.name)}</A>\n`;
+    h += '</DL><p>\n';
+  }
+  h += '</DL><p>\n';
+  download('ym-nav-bookmarks.html', h, 'text/html');
+});
+function parseCsv(text) {
+  const rows = []; let row = [], cur = '', inQ = false;
+  text = text.replace(/^﻿/, '');
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i];
+    if (inQ) { if (c === '"') { if (text[i + 1] === '"') { cur += '"'; i++; } else inQ = false; } else cur += c; }
+    else if (c === '"') inQ = true;
+    else if (c === ',') { row.push(cur); cur = ''; }
+    else if (c === '\n' || c === '\r') { if (c === '\r' && text[i + 1] === '\n') i++; row.push(cur); cur = ''; if (row.some((x) => x.trim())) rows.push(row); row = []; }
+    else cur += c;
+  }
+  row.push(cur); if (row.some((x) => x.trim())) rows.push(row);
+  return rows;
+}
+function findOrCreateSection(title) {
+  let sec = S.cfg.sections.find((s) => s.title === title);
+  if (!sec) { sec = { id: uid('sec_'), title, titleEn: '', icon: 'fa-solid fa-folder', accent: '#6366f1', layout: 'card', linkStyle: 'icon', links: [] }; S.cfg.sections.push(sec); }
+  return sec;
+}
+function appendLink(sec, link) {
+  if (sec.links.some((l) => l.url === link.url)) return false;
+  sec.links.push({ id: uid('link_'), icon: '', color: '', badge: '', nameEn: '', ...link });
+  return true;
+}
+$('#impGo').addEventListener('click', async () => {
+  const f = $('#impFile').files[0];
+  if (!f) { toast(T('先选文件', 'Choose a file first')); return; }
+  const text = await f.text();
+  const lower = f.name.toLowerCase();
+  try {
+    if (lower.endsWith('.json')) {
+      const obj = JSON.parse(text);
+      if (!obj || !Array.isArray(obj.sections)) throw new Error('JSON 里没有 sections');
+      if (!confirm(T(`将用文件里的 ${obj.sections.length} 个分类整体替换当前数据，继续？`, 'Replace all data with this file?'))) return;
+      obj.settings = { ...(S.cfg.settings || {}), ...(obj.settings || {}) };
+      S.cfg = obj;
+    } else if (lower.endsWith('.csv')) {
+      const rows = parseCsv(text);
+      let added = 0;
+      for (const r of rows) {
+        if (!r[3] || !/^https?:\/\//i.test(r[3].trim())) continue;
+        if (r[0] === '区域') continue;
+        const sec = findOrCreateSection((r[0] || '未分类').trim());
+        let name = (r[1] || r[3]).trim(); let badge = '';
+        const mb = name.match(/(本地|挂梯)\s*$/);
+        if (r[4] && (r[4].includes('本地') || r[4].includes('挂梯'))) badge = r[4].includes('本地') ? 'local' : 'proxy';
+        else if (mb) { badge = mb[1] === '本地' ? 'local' : 'proxy'; name = name.replace(/(本地|挂梯)\s*$/, '').trim(); }
+        if (appendLink(sec, { name, nameEn: (r[2] || '').trim(), url: r[3].trim(), badge })) added++;
+      }
+      toast(T(`CSV 导入完成，新增 ${added} 条`, `CSV imported, ${added} added`));
+    } else if (lower.endsWith('.html') || lower.endsWith('.htm')) {
+      const doc = new DOMParser().parseFromString(text, 'text/html');
+      let cur = '未分类', added = 0;
+      const walk = (node) => {
+        for (const el of node.children || []) {
+          if (el.tagName === 'H3') cur = el.textContent.trim() || cur;
+          else if (el.tagName === 'A' && el.href) { if (appendLink(findOrCreateSection(cur), { name: el.textContent.trim() || el.href, url: el.href })) added++; }
+          walk(el);
+        }
+      };
+      walk(doc.body);
+      toast(T(`书签导入完成，新增 ${added} 条`, `Bookmarks imported, ${added} added`));
+    } else { toast(T('不支持的文件类型', 'Unsupported file')); return; }
+    $('#mData').classList.remove('open');
+    if (await save(true)) render();
+  } catch (e) { toast(T('导入失败：', 'Import failed: ') + e.message); }
+});
+$('#abData').addEventListener('click', () => open('#mData'));
+
+/* ---------------- tools / password ---------------- */
+$('#abTools').addEventListener('click', () => {
+  $('#bmlet').href = `javascript:window.open('${location.origin}/?add='+encodeURIComponent(location.href)+'&t='+encodeURIComponent(document.title),'_blank')`;
+  open('#mTools');
+});
+$('#abPwd').addEventListener('click', () => { $('#pwdOld').value = ''; $('#pwdNew').value = ''; open('#mPwd'); });
+$('#pwdGo').addEventListener('click', async () => {
+  try {
+    const r = await fetch('/api/setup', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ oldPassword: $('#pwdOld').value, newPassword: $('#pwdNew').value }) });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(d.error || r.status);
+    $('#mPwd').classList.remove('open'); toast(T('密码已修改', 'Password changed'));
+  } catch (e) { toast(e.message === 'wrong old password' ? T('旧密码不对', 'Wrong old password') : T('失败：', 'Failed: ') + e.message); }
+});
+$('#langBtn').addEventListener('click', () => { S.lang = S.lang === 'zh' ? 'en' : 'zh'; localStorage.setItem('ymnav_lang', S.lang); render(); });
+$('#themeBtn').addEventListener('click', () => {
+  const cur = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark';
+  document.documentElement.dataset.theme = cur; localStorage.setItem('ymnav_theme', cur);
+});
+
+/* ---------------- boot ---------------- */
+(async () => {
+  const params = new URLSearchParams(location.search);
+  if (params.get('add')) S.pendingAdd = { url: params.get('add'), t: params.get('t') || '' };
+  await load();
+  tick(); setInterval(tick, 1000); weather();
+  render();
+  $('#langBtn').textContent = S.lang === 'zh' ? 'EN' : '中文';
+  if (S.pendingAdd) {
+    if (S.authed) { const p = S.pendingAdd; S.pendingAdd = null; openLinkEditor(null, null, p); }
+    else { toast(T('先登录管理员，再收藏这个网页', 'Log in to save this page')); openLogin(); }
+    history.replaceState(null, '', location.pathname);
+  }
+})();
+</script>
+</body>
+</html>
