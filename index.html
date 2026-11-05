@@ -287,7 +287,8 @@
     <button class="x" data-close>✕</button>
     <h3>站点设置</h3>
     <div class="fld"><label>站点名称</label><input type="text" id="setName"></div>
-    <div class="fld"><label>站点英文名</label><input type="text" id="setNameEn"></div>
+    <div class="fld"><label>站点英文名 <button type="button" class="btn sm ghost" id="transBtn" style="margin-left:6px">自动翻译</button></label><input type="text" id="setNameEn"></div>
+    <p class="hint" style="margin:-6px 0 10px">修改站点名称时会自动翻译填入；也可以点「自动翻译」重新生成，手改过就不再覆盖。</p>
     <div class="fld"><label>壁纸图片 URL（可空）</label><input type="url" id="setWallpaper" placeholder="https://…"></div>
     <div class="swrow"><span>默认主题（自动=跟随系统）</span>
       <select id="setTheme"><option value="auto">自动</option><option value="light">浅色</option><option value="dark">深色</option></select></div>
@@ -306,7 +307,8 @@
     <button class="x" data-close>✕</button>
     <h3>数据管理</h3>
     <p class="hint">导出备份，或从文件导入。JSON 导入会<b>整体替换</b>当前数据（导入前先导出一份更稳妥）；
-      CSV（区域，网站名称，英文名称，网址，徽标）和浏览器书签 HTML 是<b>追加合并</b>，同分类内网址相同自动跳过。</p>
+      CSV（区域，网站名称，英文名称，网址，徽标）是<b>追加合并</b>；
+      Edge / Chrome 导出的书签 HTML 是<b>同步合并</b>：按文件夹归入同名分类，全站范围内网址重复的自动跳过，原有网站不会被改动，只有新网站会被加进来。</p>
     <div class="btns">
       <button class="btn sm" id="expJson">导出 JSON</button>
       <button class="btn sm ghost" id="expCsv">导出 CSV</button>
@@ -743,7 +745,41 @@ $('#secDelete').addEventListener('click', async () => {
 });
 
 /* ---------------- settings ---------------- */
+let enManual = false, nameTransTimer = null;
+function titleCaseEn(t) {
+  return t.replace(/(^|\s)(\S)/g, (m, sp, ch) => sp + ch.toUpperCase()).replace(/\s+/g, ' ').trim();
+}
+async function translateName(zh) {
+  zh = (zh || '').trim();
+  if (!zh || !/[一-鿿]/.test(zh)) return '';
+  try {
+    const r = await fetch('https://api.mymemory.translated.net/get?q=' + encodeURIComponent(zh) + '&langpair=zh-CN|en');
+    const d = await r.json();
+    const t = d && d.responseData && d.responseData.translatedText;
+    if (t && t.toLowerCase() !== zh.toLowerCase()) return titleCaseEn(t);
+  } catch { /* fall through to backup */ }
+  try {
+    const r = await fetch('https://translate.googleapis.com/translate_a/single?client=gtx&sl=zh-CN&tl=en&dt=t&q=' + encodeURIComponent(zh));
+    const d = await r.json();
+    const t = d && d[0] && d[0].map((x) => x[0]).join('');
+    if (t && t.toLowerCase() !== zh.toLowerCase()) return titleCaseEn(t);
+  } catch { /* give up quietly */ }
+  return '';
+}
+async function autoTranslateEn(force) {
+  if (enManual && !force) return;
+  const zh = $('#setName').value;
+  const t = await translateName(zh);
+  if (t && $('#setName').value === zh && (!enManual || force)) { $('#setNameEn').value = t; enManual = false; }
+}
+$('#setNameEn').addEventListener('input', () => { enManual = true; });
+$('#setName').addEventListener('input', () => {
+  clearTimeout(nameTransTimer);
+  nameTransTimer = setTimeout(() => autoTranslateEn(false), 700);
+});
+$('#transBtn').addEventListener('click', async () => { await autoTranslateEn(true); toast(T('已自动翻译英文名', 'English name auto-translated')); });
 $('#abSettings').addEventListener('click', () => {
+  enManual = false;
   const st = S.cfg.settings || {};
   $('#setName').value = st.siteName || ''; $('#setNameEn').value = st.siteNameEn || '';
   $('#setWallpaper').value = st.wallpaper || ''; $('#setTheme').value = st.theme || 'auto';
@@ -754,6 +790,7 @@ $('#abSettings').addEventListener('click', () => {
 $('#setSave').addEventListener('click', async () => {
   const st = S.cfg.settings;
   st.siteName = $('#setName').value.trim() || st.siteName; st.siteNameEn = $('#setNameEn').value.trim();
+  if (!st.siteNameEn && st.siteName) { const t = await translateName(st.siteName); if (t) st.siteNameEn = t; }
   st.wallpaper = $('#setWallpaper').value.trim(); st.theme = $('#setTheme').value;
   st.colsDesktop = +$('#setColsD').value || 5; st.colsMobile = +$('#setColsM').value || 3;
   st.showFrequent = $('#setFreq').checked; st.openInNewTab = $('#setNewTab').checked;
@@ -805,9 +842,21 @@ function findOrCreateSection(title) {
   if (!sec) { sec = { id: uid('sec_'), title, titleEn: '', icon: 'fa-solid fa-folder', accent: '#6366f1', layout: 'card', linkStyle: 'icon', links: [] }; S.cfg.sections.push(sec); }
   return sec;
 }
-function appendLink(sec, link) {
-  if (sec.links.some((l) => l.url === link.url)) return false;
+function normUrl(u) {
+  try {
+    const x = new URL(String(u).trim());
+    x.hash = '';
+    let path = x.pathname;
+    if (path.length > 1 && path.endsWith('/')) path = path.slice(0, -1);
+    return (x.protocol + '//' + x.host + path + x.search).toLowerCase();
+  } catch { return String(u).trim().toLowerCase().replace(/\/$/, ''); }
+}
+function allSeen() { return new Set(S.cfg.sections.flatMap((s) => s.links.map((l) => normUrl(l.url)))); }
+function appendLink(sec, link, seen) {
+  const n = normUrl(link.url);
+  if (seen ? seen.has(n) : sec.links.some((l) => normUrl(l.url) === n)) return false;
   sec.links.push({ id: uid('link_'), icon: '', color: '', badge: '', nameEn: '', ...link });
+  if (seen) seen.add(n);
   return true;
 }
 $('#impGo').addEventListener('click', async () => {
@@ -824,7 +873,8 @@ $('#impGo').addEventListener('click', async () => {
       S.cfg = obj;
     } else if (lower.endsWith('.csv')) {
       const rows = parseCsv(text);
-      let added = 0;
+      const seen = allSeen();
+      let added = 0, skipped = 0;
       for (const r of rows) {
         if (!r[3] || !/^https?:\/\//i.test(r[3].trim())) continue;
         if (r[0] === '区域') continue;
@@ -833,21 +883,42 @@ $('#impGo').addEventListener('click', async () => {
         const mb = name.match(/(本地|挂梯)\s*$/);
         if (r[4] && (r[4].includes('本地') || r[4].includes('挂梯'))) badge = r[4].includes('本地') ? 'local' : 'proxy';
         else if (mb) { badge = mb[1] === '本地' ? 'local' : 'proxy'; name = name.replace(/(本地|挂梯)\s*$/, '').trim(); }
-        if (appendLink(sec, { name, nameEn: (r[2] || '').trim(), url: r[3].trim(), badge })) added++;
+        if (appendLink(sec, { name, nameEn: (r[2] || '').trim(), url: r[3].trim(), badge }, seen)) added++; else skipped++;
       }
-      toast(T(`CSV 导入完成，新增 ${added} 条`, `CSV imported, ${added} added`));
+      toast(T(`CSV 导入完成，新增 ${added} 条，跳过重复 ${skipped} 条`, `CSV imported: ${added} added, ${skipped} duplicates skipped`));
     } else if (lower.endsWith('.html') || lower.endsWith('.htm')) {
       const doc = new DOMParser().parseFromString(text, 'text/html');
-      let cur = '未分类', added = 0;
-      const walk = (node) => {
-        for (const el of node.children || []) {
-          if (el.tagName === 'H3') cur = el.textContent.trim() || cur;
-          else if (el.tagName === 'A' && el.href) { if (appendLink(findOrCreateSection(cur), { name: el.textContent.trim() || el.href, url: el.href })) added++; }
-          walk(el);
+      const seen = allSeen();
+      const doneDL = new Set();
+      let added = 0, skipped = 0;
+      const addA = (folder, a) => {
+        const href = a.getAttribute('href') || '';
+        if (!/^https?:\/\//i.test(href)) return;
+        if (appendLink(findOrCreateSection(folder), { name: a.textContent.trim() || href, url: href }, seen)) added++; else skipped++;
+      };
+      const processDL = (dl, folder) => {
+        if (doneDL.has(dl)) return;
+        doneDL.add(dl);
+        for (const dt of dl.children || []) {
+          if (dt.tagName === 'DL') { processDL(dt, folder); continue; }
+          if (dt.tagName === 'A') { addA(folder, dt); continue; }
+          const h3 = dt.querySelector(':scope > h3');
+          const sub = dt.querySelector(':scope > dl');
+          if (h3) {
+            const name = h3.textContent.trim() || folder;
+            if (sub) processDL(sub, name);
+            const sib = dt.nextElementSibling;
+            if (sib && sib.tagName === 'DL') processDL(sib, name);
+          } else {
+            const a = dt.querySelector(':scope > a');
+            if (a) addA(folder, a);
+            if (sub) processDL(sub, folder);
+          }
         }
       };
-      walk(doc.body);
-      toast(T(`书签导入完成，新增 ${added} 条`, `Bookmarks imported, ${added} added`));
+      doc.querySelectorAll('dl').forEach((dl) => processDL(dl, '未分类'));
+      doc.querySelectorAll('body > a, body > dt > a').forEach((a) => { if (!a.closest('dl')) addA('未分类', a); });
+      toast(T(`收藏夹同步完成：新增 ${added} 条，跳过重复 ${skipped} 条`, `Favorites synced: ${added} added, ${skipped} duplicates skipped`));
     } else { toast(T('不支持的文件类型', 'Unsupported file')); return; }
     $('#mData').classList.remove('open');
     if (await save(true)) render();
