@@ -71,11 +71,11 @@
 
 | 桌面端 · 浅色 | 桌面端 · 深色 |
 | --- | --- |
-| ![桌面浅色](docs/preview-desktop.png) | ![桌面深色](docs/preview-dark.png) |
+| ![桌面浅色](https://gcore.jsdelivr.net/gh/YiMing918/ym-nav@main/docs/preview-desktop.png) | ![桌面深色](https://gcore.jsdelivr.net/gh/YiMing918/ym-nav@main/docs/preview-dark.png) |
 
 | 移动端 | 点分类只看该类 | 长按卡片看描述 |
 | --- | --- | --- |
-| ![移动端](docs/preview-mobile.png) | ![单分类视图](docs/preview-single.png) | ![长按描述](docs/preview-desc.png) |
+| ![移动端](https://gcore.jsdelivr.net/gh/YiMing918/ym-nav@main/docs/preview-mobile.png) | ![单分类视图](https://gcore.jsdelivr.net/gh/YiMing918/ym-nav@main/docs/preview-single.png) | ![长按描述](https://gcore.jsdelivr.net/gh/YiMing918/ym-nav@main/docs/preview-desc.png) |
 
 ---
 
@@ -95,17 +95,17 @@
 <details>
 <summary>📸 部署图片教程（点开看图，6 步）</summary>
 
-![部署第1步](docs/tut-deploy-1.png)
+![部署第1步](https://gcore.jsdelivr.net/gh/YiMing918/ym-nav@main/docs/tut-deploy-1.png)
 
-![部署第2步](docs/tut-deploy-2.png)
+![部署第2步](https://gcore.jsdelivr.net/gh/YiMing918/ym-nav@main/docs/tut-deploy-2.png)
 
-![部署第3步](docs/tut-deploy-3.png)
+![部署第3步](https://gcore.jsdelivr.net/gh/YiMing918/ym-nav@main/docs/tut-deploy-3.png)
 
-![部署第4步](docs/tut-deploy-4.png)
+![部署第4步](https://gcore.jsdelivr.net/gh/YiMing918/ym-nav@main/docs/tut-deploy-4.png)
 
-![部署第5步](docs/tut-deploy-5.png)
+![部署第5步](https://gcore.jsdelivr.net/gh/YiMing918/ym-nav@main/docs/tut-deploy-5.png)
 
-![部署第6步](docs/tut-deploy-6.png)
+![部署第6步](https://gcore.jsdelivr.net/gh/YiMing918/ym-nav@main/docs/tut-deploy-6.png)
 
 </details>
 
@@ -122,15 +122,15 @@
 <details>
 <summary>📸 升级图片教程（点开看图，5 步）</summary>
 
-![升级第1步](docs/tut-upgrade-1.png)
+![升级第1步](https://gcore.jsdelivr.net/gh/YiMing918/ym-nav@main/docs/tut-upgrade-1.png)
 
-![升级第2步](docs/tut-upgrade-2.png)
+![升级第2步](https://gcore.jsdelivr.net/gh/YiMing918/ym-nav@main/docs/tut-upgrade-2.png)
 
-![升级第3步](docs/tut-upgrade-3.png)
+![升级第3步](https://gcore.jsdelivr.net/gh/YiMing918/ym-nav@main/docs/tut-upgrade-3.png)
 
-![升级第4步](docs/tut-upgrade-4.png)
+![升级第4步](https://gcore.jsdelivr.net/gh/YiMing918/ym-nav@main/docs/tut-upgrade-4.png)
 
-![升级第5步](docs/tut-upgrade-5.png)
+![升级第5步](https://gcore.jsdelivr.net/gh/YiMing918/ym-nav@main/docs/tut-upgrade-5.png)
 
 </details>
 
