@@ -2,17 +2,18 @@
 // Parses the site's homepage for <link rel="icon"> / apple-touch-icon (largest
 // first), falls back to /apple-touch-icon.png and /favicon.ico. Successful
 // icons are cached in KV by host (key "icon:<host>"); misses are cached for
-// 7 days so dead sites are not refetched on every page view.
+// 30 days so dead sites are not refetched on every page view.
 //
 // SSRF hardening: every outbound fetch goes through safeFetch()
 // (functions/_ssrf.js) — redirects are followed manually, at most 5
 // hops, and every hop target is re-validated, so a public page cannot
 // bounce this endpoint into loopback / private / reserved addresses.
-// Rate limiting: per-IP KV counter isomorphic to the login limiter
-// ("rl:icon:<ip>", 15-min window, 15-min lock, 2-day TTL) at 120
-// requests per window — login's threshold of 5 counts *failures*;
+// Rate limiting: per-IP in-memory counter (functions/_ssrf.js) at 120
+// requests per 15-min window — login's threshold of 5 counts *failures*;
 // icons are counted per request and a nav page legitimately needs
-// dozens, hence the higher number on the same mechanism.
+// dozens, hence the higher number on the same mechanism. The counter is
+// deliberately NOT in KV: a per-request KV write here is what exhausted
+// the account's daily KV write quota on 2026-11-12.
 import { json } from '../_auth.js';
 import { assertSafeUrl, safeFetch, rateLimited } from '../_ssrf.js';
 
@@ -102,7 +103,7 @@ export async function onRequestGet({ request, env }) {
   }
   const icon = await resolveIcon(u);
   if (!icon) {
-    if (env.NAV_KV) { try { await env.NAV_KV.put(key + ':miss', '1', { expirationTtl: 7 * 24 * 3600 }); } catch { /* ignore */ } }
+    if (env.NAV_KV) { try { await env.NAV_KV.put(key + ':miss', '1', { expirationTtl: 30 * 24 * 3600 }); } catch { /* ignore */ } }
     return json({ error: 'no icon' }, 404);
   }
   if (env.NAV_KV) {

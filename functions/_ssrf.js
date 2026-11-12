@@ -241,37 +241,43 @@ export async function safeFetch(input, init = {}, opts = {}) {
   }
 }
 
-// KV rate-limit gate, isomorphic to the login limiter in
-// functions/api/login.js: same KV key scheme ("rl:<scope>:<ip>"),
-// same state shape (count + window start + lock-until), same 15-min
-// window, same 15-min lock, same 2-day KV TTL. Only the counted event
-// and the threshold differ per endpoint, because login counts
-// *failures* (5) while these endpoints count *requests* — copying the
-// number 5 verbatim would lock a normal nav page (dozens of icons)
-// out for 15 minutes. Returns true when the caller must stop (429).
-// KV errors fail open (the login state reader degrades the same way):
-// a broken limiter must not take the endpoint down with it.
+// In-memory rate-limit gate (per isolate): same state shape (count +
+// window start + lock-until), same 15-min window, same 15-min lock.
+// Only the counted event and the threshold differ per endpoint, because
+// login counts *failures* (5) while these endpoints count *requests* —
+// copying the number 5 verbatim would lock a normal nav page (dozens of
+// icons) out for 15 minutes. Returns true when the caller must stop (429).
+//
+// This gate used to be KV-backed and wrote once per call. It runs on
+// EVERY icon/probe request, and on 2026-11-12 that alone burned through
+// the account's 1,000 KV writes/day free quota (one write per icon on
+// every page render), taking down every login on the account. Counting
+// in isolate memory is best-effort — each isolate counts separately and
+// state resets when an isolate is recycled — but these endpoints only
+// need coarse abuse damping, and a limiter must never be able to take
+// the site (or the account's quota) down with it.
+const rlBuckets = new Map();
 export async function rateLimited(env, request, { scope, limit, windowMs = 15 * 60 * 1000, lockMs = 15 * 60 * 1000 }) {
-  if (!env || !env.NAV_KV) return false;
-  const ip = request.headers.get('cf-connecting-ip') || 'unknown';
-  const key = 'rl:' + scope + ':' + ip;
-  try {
-    let st = null;
-    try { st = JSON.parse((await env.NAV_KV.get(key)) || 'null'); } catch { st = null; }
-    const now = Date.now();
-    if (st && st.lockUntil && st.lockUntil > now) return true;
-    const r = st && st.winStart && now - st.winStart <= windowMs
-      ? st
-      : { hits: 0, winStart: now, lockUntil: 0 };
-    r.hits = (r.hits || 0) + 1;
-    if (r.hits > limit) {
-      r.lockUntil = now + lockMs;
-      await env.NAV_KV.put(key, JSON.stringify(r), { expirationTtl: 2 * 24 * 3600 });
-      return true;
-    }
-    await env.NAV_KV.put(key, JSON.stringify(r), { expirationTtl: 2 * 24 * 3600 });
-    return false;
-  } catch {
-    return false;
+  const ip = (request && request.headers && request.headers.get('cf-connecting-ip')) || 'unknown';
+  const key = scope + ':' + ip;
+  const now = Date.now();
+  let r = rlBuckets.get(key);
+  if (r && r.lockUntil && r.lockUntil > now) return true;
+  if (!r || !r.winStart || now - r.winStart > windowMs) {
+    r = { hits: 0, winStart: now, lockUntil: 0 };
   }
+  r.hits = (r.hits || 0) + 1;
+  if (r.hits > limit) {
+    r.lockUntil = now + lockMs;
+    rlBuckets.set(key, r);
+    return true;
+  }
+  rlBuckets.set(key, r);
+  // Opportunistic cleanup so the map cannot grow without bound.
+  if (rlBuckets.size > 500) {
+    for (const [k, v] of rlBuckets) {
+      if ((!v.lockUntil || v.lockUntil <= now) && now - (v.winStart || 0) > windowMs) rlBuckets.delete(k);
+    }
+  }
+  return false;
 }

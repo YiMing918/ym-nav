@@ -733,6 +733,38 @@ $('#catMenu').addEventListener('click', (e) => {
   render();
   scrollTo({ top: 0 });
 });
+/* ---------------- click reporting (batched) ----------------
+   Clicks are accumulated client-side and flushed as one
+   { items: { id: n } } report — once 8 clicks are pending, every 20 s,
+   and when the page hides/closes — so a browsing session costs a
+   handful of KV writes instead of one write per tap. Pending counts
+   survive reloads via localStorage; a lost flush only loses counts,
+   never anything else. */
+const CLICKQ_KEY = 'ymnav_clickq';
+let clickQ = {};
+try { clickQ = JSON.parse(localStorage.getItem(CLICKQ_KEY) || '{}') || {}; } catch { clickQ = {}; }
+let clickTimer = null;
+function persistClickQ() { try { localStorage.setItem(CLICKQ_KEY, JSON.stringify(clickQ)); } catch { /* ignore */ } }
+function flushClicks() {
+  const items = clickQ;
+  const total = Object.values(items).reduce((a, b) => a + b, 0);
+  if (!total) return;
+  clickQ = {};
+  persistClickQ();
+  const body = JSON.stringify({ items });
+  if (navigator.sendBeacon) navigator.sendBeacon('/api/click', new Blob([body], { type: 'application/json' }));
+  else fetch('/api/click', { method: 'POST', body, keepalive: true }).catch(() => {});
+}
+function queueClick(id) {
+  clickQ[id] = (clickQ[id] || 0) + 1;
+  persistClickQ();
+  const total = Object.values(clickQ).reduce((a, b) => a + b, 0);
+  if (total >= 8) { flushClicks(); return; }
+  if (!clickTimer) clickTimer = setTimeout(() => { clickTimer = null; flushClicks(); }, 20000);
+}
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') flushClicks(); });
+window.addEventListener('pagehide', flushClicks);
+
 $('#main').addEventListener('click', (e) => {
   const addBtn = e.target.closest('[data-addto]');
   if (addBtn) { openLinkEditor(addBtn.dataset.addto, null); return; }
@@ -748,9 +780,7 @@ $('#main').addEventListener('click', (e) => {
   }
   if (!tile) return;
   if (S.edit) { e.preventDefault(); openLinkEditor(tile.dataset.sec, tile.dataset.id); return; }
-  const body = JSON.stringify({ id: tile.dataset.id });
-  if (navigator.sendBeacon) navigator.sendBeacon('/api/click', new Blob([body], { type: 'application/json' }));
-  else fetch('/api/click', { method: 'POST', body, keepalive: true }).catch(() => {});
+  queueClick(tile.dataset.id);
   S.clicks[tile.dataset.id] = (S.clicks[tile.dataset.id] || 0) + 1;
 });
 
