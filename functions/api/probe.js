@@ -57,6 +57,7 @@ export async function onRequestPost({ request, env }) {
   }
   let body;
   try { body = await request.json(); } catch { return json({ error: 'bad json' }, 400); }
+  if (!body || typeof body !== 'object') return json({ error: 'bad json' }, 400);
   const items = Array.isArray(body.items) ? body.items.slice(0, 25) : [];
   const queue = [...items];
   const results = [];

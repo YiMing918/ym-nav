@@ -5,11 +5,23 @@
 // Both shapes only count ids that exist in the config (an arbitrary id
 // must not be able to grow the clicks map or pollute the "frequent" area).
 import { json } from '../_auth.js';
+import { rateLimited } from '../_ssrf.js';
 
-const MAX_ITEMS = 100;    // distinct links per flush
-const MAX_PER_ITEM = 100; // clicks per link per flush (sanity cap)
+const MAX_ITEMS = 100;  // distinct links per flush
+const MAX_PER_ITEM = 5; // clicks per link per flush (was 100: an anonymous
+                        // caller could inflate any link's "frequent" rank
+                        // by +100 per request; a real flush never carries
+                        // more than a couple of clicks per link)
 
 export async function onRequestPost({ request, env }) {
+  // 本端点匿名可调且每个有效请求固定写 1 次 KV——此前零限流，循环
+  // POST 1000 次就能烧完全账号当天的 KV 写额度（2026-11-12 事故的
+  // 同款形状），顺带刷爆任意链接的计数。复用现成内存限流：正常
+  // 前端 20 秒才 flush 一次，30 次/15 分钟绰绰有余；计数仍只在内存，
+  // 不为限流本身再写 KV。
+  if (await rateLimited(env, request, { scope: 'click', limit: 30 })) {
+    return json({ error: 'too many attempts, try again in 15 minutes' }, 429);
+  }
   let body;
   try { body = await request.json(); } catch { return json({ error: 'bad json' }, 400); }
   // Normalize both shapes to an { id: delta } map.

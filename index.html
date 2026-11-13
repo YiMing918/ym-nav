@@ -349,7 +349,7 @@
         <input type="number" step="any" min="-180" max="180" id="setFbLon" placeholder="经度" style="flex:1;min-width:0">
         <input type="text" id="setFbCity" placeholder="城市名" style="flex:1;min-width:0">
       </div>
-      <p class="hint">填你自己城市的坐标即可（在地图或天气网站上搜城市名就能查到经纬度）。纬度、经度都填了才生效，城市名可空；全部留空 = 不兜底，定位失败时不显示天气。坐标只保存在你的站点配置里，不写进代码。</p>
+      <p class="hint">填你自己城市的坐标即可（在地图或天气网站上搜城市名就能查到经纬度）。纬度、经度都填了才生效，城市名可空；全部留空 = 不兜底，定位失败时不显示天气。坐标保存在你的站点配置里（不写进代码）；未登录访客只会拿到粗化到 0.1°（约 11km）的坐标，不会暴露精确位置。</p>
     </div>
     <div class="btns"><button class="btn" id="setSave">保存设置</button>
       <button class="btn ghost" data-close>取消</button></div>
@@ -640,7 +640,7 @@ function matches(l) {
   const q = S.query.toLowerCase();
   return (l.name || '').toLowerCase().includes(q) || (l.nameEn || '').toLowerCase().includes(q) || (l.url || '').toLowerCase().includes(q);
 }
-function allLinks() { return (S.cfg.sections || []).flatMap((s) => s.links.map((l) => [l, s])); }
+function allLinks() { return (S.cfg.sections || []).flatMap((s) => (s.links || []).map((l) => [l, s])); }
 
 function render() {
   applySettings();
@@ -1207,7 +1207,7 @@ function normUrl(u) {
     return x.protocol + '//' + x.host + path + x.search;
   } catch { return String(u).trim().toLowerCase().replace(/\/$/, ''); }
 }
-function allSeen() { return new Set(S.cfg.sections.flatMap((s) => s.links.map((l) => normUrl(l.url)))); }
+function allSeen() { return new Set((S.cfg.sections || []).flatMap((s) => (s.links || []).map((l) => normUrl(l.url)))); }
 function appendLink(sec, link, seen) {
   const n = normUrl(link.url);
   if (seen ? seen.has(n) : sec.links.some((l) => normUrl(l.url) === n)) return false;
@@ -1232,6 +1232,23 @@ $('#impGo').addEventListener('click', async () => {
       if (!impArm || impArm.key !== key) {
         const obj = JSON.parse(text);
         if (!obj || !Array.isArray(obj.sections)) throw new Error('JSON 里没有 sections');
+        // 逐条规范化：外来/旧备份 JSON 的 section 可能缺 links、链接缺
+        // id 或缺 url——不修补就保存，render 会抛错白屏且难以自救。
+        // 缺 url 的丢弃、缺 id 的补 uid、按 normUrl 全局去重。
+        const seenImp = new Set();
+        obj.sections = obj.sections.filter((s) => s && typeof s === 'object');
+        for (const s of obj.sections) {
+          if (!Array.isArray(s.links)) s.links = [];
+          s.links = s.links.filter((l) => {
+            if (!l || typeof l !== 'object' || !String(l.url || '').trim()) return false;
+            const n = normUrl(l.url);
+            if (seenImp.has(n)) return false;
+            seenImp.add(n);
+            if (!l.id) l.id = uid('link_');
+            if (!l.name) l.name = l.url;
+            return true;
+          });
+        }
         impArm = { key, obj };
         $('#impGo').textContent = T(`再点一次确认导入：将整体替换为 ${obj.sections.length} 个分类`, 'Click again to confirm replace-all import');
         toast(T('JSON 导入会整体替换当前数据，确认无误请再点一次导入按钮', 'JSON import replaces ALL data — tap Import again to confirm'));

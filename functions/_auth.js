@@ -16,10 +16,49 @@ export function json(data, status = 200, extraHeaders = {}) {
   });
 }
 
-export async function hashPassword(password, salt) {
+// 口令哈希：新哈希一律 PBKDF2-SHA256 100,000 轮。此前是单轮
+// SHA-256(salt::密码)：盐有，但对离线爆破毫无阻力——KV 一旦泄露，
+// 统一密码可被快速撞开。旧哈希保持可验，登录成功时由 login.js
+// 顺手升级（isLegacyHash），站长无感、无需改密码。
+const PBKDF2_ITER = 100000;
+
+async function pbkdf2hex(password, salt, iter) {
+  const enc = new TextEncoder();
+  const key = await crypto.subtle.importKey('raw', enc.encode(password), 'PBKDF2', false, ['deriveBits']);
+  const bits = await crypto.subtle.deriveBits(
+    { name: 'PBKDF2', hash: 'SHA-256', salt: enc.encode(salt), iterations: iter }, key, 256);
+  return [...new Uint8Array(bits)].map((b) => b.toString(16).padStart(2, '0')).join('');
+}
+
+async function legacyHash(password, salt) {
   const data = new TextEncoder().encode(salt + '::' + password);
   const buf = await crypto.subtle.digest('SHA-256', data);
   return [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, '0')).join('');
+}
+
+function timingSafeEq(a, b) {
+  if (typeof a !== 'string' || typeof b !== 'string' || a.length !== b.length) return false;
+  let diff = 0;
+  for (let i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  return diff === 0;
+}
+
+export async function hashPassword(password, salt) {
+  return 'pbkdf2:' + PBKDF2_ITER + ':' + (await pbkdf2hex(password, salt, PBKDF2_ITER));
+}
+
+export function isLegacyHash(admin) {
+  return !!(admin && admin.hash && !String(admin.hash).startsWith('pbkdf2:'));
+}
+
+export async function verifyPassword(password, admin) {
+  if (!admin || !admin.salt || !admin.hash) return false;
+  if (String(admin.hash).startsWith('pbkdf2:')) {
+    const parts = String(admin.hash).split(':');
+    const iter = parseInt(parts[1], 10) || PBKDF2_ITER;
+    return timingSafeEq(await pbkdf2hex(password, admin.salt, iter), parts[2] || '');
+  }
+  return timingSafeEq(await legacyHash(password, admin.salt), admin.hash);
 }
 
 export function randomHex(bytes = 16) {

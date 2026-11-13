@@ -8,11 +8,12 @@
 //    Bumps the admin session version, which invalidates every existing
 //    session (see _auth.js); the caller gets a fresh session cookie so
 //    they stay logged in on this device.
-import { json, getAdmin, hashPassword, randomHex, createSession, sessionCookie, isAuthed, adminVer } from '../_auth.js';
+import { json, getAdmin, hashPassword, verifyPassword, randomHex, createSession, sessionCookie, isAuthed, adminVer } from '../_auth.js';
 
 export async function onRequestPost({ request, env }) {
   let body;
   try { body = await request.json(); } catch { return json({ error: 'bad json' }, 400); }
+  if (!body || typeof body !== 'object') return json({ error: 'bad json' }, 400);
   const admin = await getAdmin(env);
 
   if (!admin) {
@@ -31,8 +32,7 @@ export async function onRequestPost({ request, env }) {
 
   // Change password requires a valid session + the old password.
   if (!(await isAuthed(request, env))) return json({ error: 'unauthorized' }, 401);
-  const oldHash = await hashPassword(String(body.oldPassword || ''), admin.salt);
-  if (oldHash !== admin.hash) return json({ error: 'wrong old password' }, 403);
+  if (!(await verifyPassword(String(body.oldPassword || ''), admin))) return json({ error: 'wrong old password' }, 403);
   const newPassword = String(body.newPassword || '');
   if (newPassword.length < 6) return json({ error: 'password too short (min 6)' }, 400);
   const salt = randomHex(16);

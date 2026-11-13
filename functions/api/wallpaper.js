@@ -13,7 +13,7 @@ export async function onRequestGet({ env }) {
   const type = (await env.NAV_KV.get('wallpaper_type')) || 'image/jpeg';
   return new Response(buf, {
     status: 200,
-    headers: { 'Content-Type': type, 'Cache-Control': 'public, max-age=600' },
+    headers: { 'Content-Type': type, 'Cache-Control': 'public, max-age=600', 'X-Content-Type-Options': 'nosniff' },
   });
 }
 
@@ -25,6 +25,8 @@ export async function onRequestPost({ request, env }) {
   if (buf.byteLength > MAX_BYTES) return json({ error: 'image too large' }, 413);
   const type = (request.headers.get('Content-Type') || '').split(';')[0].trim();
   if (!type.startsWith('image/')) return json({ error: 'not an image' }, 415);
+  // SVG 是可带脚本的文档不是位图壁纸：拒掉，免得它以站点自身源对外下发
+  if (type === 'image/svg+xml') return json({ error: 'svg not allowed' }, 415);
   await env.NAV_KV.put('wallpaper_img', buf);
   await env.NAV_KV.put('wallpaper_type', type);
   return json({ success: true, bytes: buf.byteLength, type });

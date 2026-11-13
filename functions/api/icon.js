@@ -9,11 +9,13 @@
 // hops, and every hop target is re-validated, so a public page cannot
 // bounce this endpoint into loopback / private / reserved addresses.
 // Rate limiting: per-IP in-memory counter (functions/_ssrf.js) at 120
-// requests per 15-min window — login's threshold of 5 counts *failures*;
-// icons are counted per request and a nav page legitimately needs
-// dozens, hence the higher number on the same mechanism. The counter is
-// deliberately NOT in KV: a per-request KV write here is what exhausted
-// the account's daily KV write quota on 2026-11-12.
+// per 15-min window, counted only on cache MISSES (counting hits used
+// to burn the budget on a cold first paint and 429 the owner himself).
+// The counter is deliberately NOT in KV: a per-request KV write here
+// is what exhausted the account's daily KV write quota on 2026-11-12.
+// Cache writes are additionally restricted to hosts that exist in the
+// site config — a stranger host is resolved live but never persisted,
+// so wildcard-DNS host spraying cannot mint KV writes.
 import { json } from '../_auth.js';
 import { assertSafeUrl, safeFetch, rateLimited, readBodyLimited } from '../_ssrf.js';
 
@@ -114,9 +116,6 @@ export async function onRequestGet({ request, env }) {
   try { u = assertSafeUrl(q); } catch {
     return json({ error: isBadSyntax(q) ? 'bad url' : 'blocked' }, 400);
   }
-  if (await rateLimited(env, request, { scope: 'icon', limit: 120 })) {
-    return json({ error: 'too many attempts, try again in 15 minutes' }, 429);
-  }
   const host = u.hostname.toLowerCase();
   const key = 'icon:' + host;
   if (env.NAV_KV) {
@@ -126,15 +125,40 @@ export async function onRequestGet({ request, env }) {
       if (await env.NAV_KV.get(key + ':miss')) return json({ error: 'no icon' }, 404);
     } catch { /* cache read failed; resolve live */ }
   }
-  const icon = await resolveIcon(u);
-  if (!icon) {
-    if (env.NAV_KV) { try { await env.NAV_KV.put(key + ':miss', '1', { expirationTtl: 30 * 24 * 3600 }); } catch { /* ignore */ } }
-    return json({ error: 'no icon' }, 404);
+  // 限流只管「真要外抓 + 写 KV」的未命中路径：以前它排在查缓存之前，
+  // 命中缓存的请求也烧额度，公开区 200 多个图标首屏集中加载时可能
+  // 把站长自己误伤成 429（图标回退成字母，看着像站点坏了）。
+  if (await rateLimited(env, request, { scope: 'icon', limit: 120 })) {
+    return json({ error: 'too many attempts, try again in 15 minutes' }, 429);
   }
+  // 只给「配置里真实存在的链接主机」落缓存：缓存键按主机名，陌生
+  // 主机（比如泛解析批量造的子域名）以前也能各写一份图标进来，
+  // 持续消耗全账号写额度。陌生主机照常实时解析返回、只是不落 KV。
+  let cacheable = false;
   if (env.NAV_KV) {
     try {
-      await env.NAV_KV.put(key, icon.buf);
-      await env.NAV_KV.put(key + ':t', icon.type);
+      const rawCfg = await env.NAV_KV.get('site_config');
+      if (rawCfg) {
+        const cfg = JSON.parse(rawCfg);
+        const hosts = new Set();
+        for (const s of cfg.sections || []) for (const l of s.links || []) {
+          try { hosts.add(new URL(l.url).hostname.toLowerCase()); } catch { /* skip bad url */ }
+        }
+        cacheable = hosts.has(host);
+      }
+    } catch { /* config unreadable: resolve live without caching */ }
+  }
+  const icon = await resolveIcon(u);
+  if (!icon) {
+    if (env.NAV_KV && cacheable) { try { await env.NAV_KV.put(key + ':miss', '1', { expirationTtl: 30 * 24 * 3600 }); } catch { /* ignore */ } }
+    return json({ error: 'no icon' }, 404);
+  }
+  if (env.NAV_KV && cacheable) {
+    try {
+      // 成功条目也给 90 天 TTL：以前永不过期，站点换了图标这边永远
+      // 是旧的，KV 也只增不减
+      await env.NAV_KV.put(key, icon.buf, { expirationTtl: 90 * 24 * 3600 });
+      await env.NAV_KV.put(key + ':t', icon.type, { expirationTtl: 90 * 24 * 3600 });
     } catch { /* ignore */ }
   }
   return imgResp(icon.buf, icon.type);

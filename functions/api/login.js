@@ -1,5 +1,5 @@
 // POST /api/login { username, password } -> sets HttpOnly session cookie
-import { json, getAdmin, hashPassword, createSession, sessionCookie } from '../_auth.js';
+import { json, getAdmin, verifyPassword, hashPassword, isLegacyHash, createSession, sessionCookie } from '../_auth.js';
 
 // 登录失败限流：同来源 IP 15 分钟内失败 >=5 次锁定 15 分钟。
 // 计数只存内存（按 isolate），不写 KV：旧版每次失败都往 KV 写一次，
@@ -29,6 +29,7 @@ export async function onRequestPost({ request, env }) {
   if (rlLocked(ip)) return json({ error: 'too many attempts, try again in 15 minutes' }, 429);
   let body;
   try { body = await request.json(); } catch { return json({ error: 'bad json' }, 400); }
+  if (!body || typeof body !== 'object') return json({ error: 'bad json' }, 400);
   const password = String(body.password || '');
   const username = String(body.username || '').trim();
   if (!password) return json({ error: 'empty password' }, 400);
@@ -37,8 +38,14 @@ export async function onRequestPost({ request, env }) {
     return json({ error: 'wrong credentials' }, 403);
   };
   if (admin.username && username !== admin.username) return fail();
-  const hash = await hashPassword(password, admin.salt);
-  if (hash !== admin.hash) return fail();
+  if (!(await verifyPassword(password, admin))) return fail();
+  // 旧版单轮 SHA-256 哈希在登录成功时顺手升级为 PBKDF2（盐不变，其余字段原样）
+  if (isLegacyHash(admin)) {
+    try {
+      const hash = await hashPassword(password, admin.salt);
+      await env.NAV_KV.put('admin', JSON.stringify({ ...admin, hash }));
+    } catch { /* 升级失败不阻塞登录，下次再试 */ }
+  }
   loginFails.delete(ip);
   const token = await createSession(env);
   return json({ ok: true }, 200, { 'Set-Cookie': sessionCookie(token) });
