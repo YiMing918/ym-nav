@@ -54,11 +54,32 @@ export async function onRequestPost({ request, env }) {
   if (!body || typeof body !== 'object' || !Array.isArray(body.sections)) {
     return json({ error: 'invalid config: sections array required' }, 400);
   }
+  // Link URLs render as <a href> in the page: script-bearing schemes must
+  // never reach storage, no matter which client sent them.
+  for (const s of body.sections) {
+    for (const l of (s && s.links) || []) {
+      if (l && /^\s*(javascript|data|vbscript|file)\s*:/i.test(String(l.url || ''))) {
+        return json({ error: 'link url scheme not allowed' }, 400);
+      }
+    }
+  }
+  // Optimistic concurrency: clients that loaded the config send back the
+  // updatedAt they loaded (baseUpdatedAt). If the stored config has moved
+  // on since (another device saved in between), refuse instead of letting
+  // the stale copy silently overwrite the newer one. Clients that send
+  // no baseUpdatedAt (older builds) keep the previous behaviour.
+  const raw = await env.NAV_KV.get('site_config');
+  let storedUpdatedAt = null;
+  if (raw) { try { storedUpdatedAt = JSON.parse(raw).updatedAt || null; } catch { /* unparsable stored config: no baseline */ } }
+  if (body.baseUpdatedAt != null && storedUpdatedAt && body.baseUpdatedAt !== storedUpdatedAt) {
+    return json({ error: 'conflict', updatedAt: storedUpdatedAt }, 409);
+  }
+  delete body.baseUpdatedAt;
   // Never let credentials live inside the site config.
   delete body.adminPwd;
   delete body.admin;
   body.version = 1;
   body.updatedAt = new Date().toISOString();
   await env.NAV_KV.put('site_config', JSON.stringify(body));
-  return json({ ok: true });
+  return json({ ok: true, updatedAt: body.updatedAt });
 }

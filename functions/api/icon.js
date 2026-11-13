@@ -15,24 +15,47 @@
 // deliberately NOT in KV: a per-request KV write here is what exhausted
 // the account's daily KV write quota on 2026-11-12.
 import { json } from '../_auth.js';
-import { assertSafeUrl, safeFetch, rateLimited } from '../_ssrf.js';
+import { assertSafeUrl, safeFetch, rateLimited, readBodyLimited } from '../_ssrf.js';
 
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36';
 
 function imgResp(buf, type) {
   return new Response(buf, {
     status: 200,
-    headers: { 'Content-Type': type || 'image/x-icon', 'Cache-Control': 'public, max-age=604800' },
+    headers: {
+      'Content-Type': type || 'image/x-icon',
+      'Cache-Control': 'public, max-age=604800',
+      // Icons are third-party bytes served from this site's own origin.
+      // SVG is rejected in fetchIconBytes, and these headers are the
+      // second wall: even if something scriptable ever got through, a
+      // direct visit to the icon URL runs it in a sandboxed, opaque
+      // origin with no access to the admin session.
+      'Content-Security-Policy': "default-src 'none'; sandbox",
+      'X-Content-Type-Options': 'nosniff',
+    },
   });
 }
 
 async function fetchIconBytes(url) {
   const r = await safeFetch(url, { headers: { 'User-Agent': UA } }, { timeoutMs: 5000 });
   if (!r.ok) return null;
-  const type = (r.headers.get('Content-Type') || '').split(';')[0].trim();
-  const buf = await r.arrayBuffer();
-  if (!buf.byteLength || buf.byteLength > 512 * 1024) return null;
+  const type = (r.headers.get('Content-Type') || '').split(';')[0].trim().toLowerCase();
+  // SVG is an XML document that can carry script — never proxy it from
+  // this origin, no matter what the remote server claims.
+  if (type === 'image/svg+xml') return null;
+  let buf;
+  try {
+    buf = await readBodyLimited(r, { maxBytes: 512 * 1024, timeoutMs: 8000 });
+  } catch { return null; }
+  if (!buf.byteLength) return null;
   if (type && !type.startsWith('image/') && !type.includes('icon')) return null;
+  // Content sniff as a backstop: a mislabelled SVG/HTML body starts with
+  // '<' (after any BOM / whitespace); real raster icons never do.
+  const bytes = new Uint8Array(buf.slice(0, 64));
+  let i = 0;
+  if (bytes[0] === 0xef && bytes[1] === 0xbb && bytes[2] === 0xbf) i = 3;
+  while (i < bytes.length && (bytes[i] === 0x20 || bytes[i] === 0x09 || bytes[i] === 0x0a || bytes[i] === 0x0d)) i++;
+  if (bytes[i] === 0x3c) return null; // '<'
   return { buf, type: type || 'image/x-icon' };
 }
 
@@ -45,7 +68,9 @@ async function resolveIcon(u) {
       // (validated) redirects, not the originally requested one.
       let base = u;
       try { if (r.url) base = new URL(r.url); } catch { /* keep original base */ }
-      const html = await r.text();
+      // Bounded read: a hostile homepage could otherwise stream an
+      // unbounded body into memory (safeFetch's timeout ends at headers).
+      const html = new TextDecoder().decode(await readBodyLimited(r, { maxBytes: 1024 * 1024, timeoutMs: 8000 }));
       const links = [];
       const re = /<link[^>]+>/gi;
       let m;

@@ -109,8 +109,11 @@
   .tile .nm.fit2{white-space:normal; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; line-height:1.3; word-break:break-all; font-size:11.5px}
   /* vertical tiles: icon / name / domain, centered */
   .grid.vt{gap:9px}
-  @media(max-width:640px){ .grid.vt{grid-template-columns:repeat(4,1fr)} }
-  @media(min-width:641px){ .grid.vt{grid-template-columns:repeat(6,1fr)} }
+  /* Vertical-card grids follow the same column settings as the other
+     layouts; they used to be hardcoded to 4/6, which silently made the
+     settings-panel column controls do nothing on all-vertical sites. */
+  @media(max-width:640px){ .grid.vt{grid-template-columns:repeat(var(--cm),1fr)} }
+  @media(min-width:641px){ .grid.vt{grid-template-columns:repeat(var(--cd),1fr)} }
   .tile.v{flex-direction:column; align-items:center; text-align:center; padding:13px 5px 10px; gap:0; -webkit-touch-callout:none}
   .tile.v .ic{width:46px; height:46px; border-radius:13px; margin-bottom:7px}
   .tile.v .ic img{width:27px; height:27px}
@@ -420,6 +423,18 @@ const S = {
   cfg: null, clicks: {}, authed: false, needsSetup: false,
   lang: localStorage.getItem('ymnav_lang') || 'zh',
   edit: false, query: '', pendingAdd: null,
+  // Data-integrity guards (2026-11-13 hardening):
+  //  dataOk        — S.cfg is the COMPLETE config exactly as the server
+  //                  sent it. False when we fell back to the public-only
+  //                  local cache (offline / fetch failed): saving then
+  //                  would overwrite private sections with the subset,
+  //                  so save() refuses while this is false.
+  //  baseUpdatedAt — the config updatedAt we loaded; sent back on save
+  //                  so the server can reject a stale overwrite (409).
+  //  lastGood      — deep copy of the last config known to match the
+  //                  server; save() rolls back to it on failure so the
+  //                  page can never silently diverge from the server.
+  dataOk: false, baseUpdatedAt: null, lastGood: null,
 };
 const T = (zh, en) => (S.lang === 'en' ? en : zh);
 const uid = (p) => p + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
@@ -439,14 +454,28 @@ function publicView(cfg) {
     .map((s) => ({ ...s, links: (s.links || []).filter((l) => !l.private) }));
   return c;
 }
+// Adopt a config that just arrived from the server: it becomes the
+// in-memory copy, the save baseline and the rollback target in one step.
+function adoptConfig(cfg, authed) {
+  S.cfg = cfg;
+  S.dataOk = !!authed;
+  S.baseUpdatedAt = (cfg && cfg.updatedAt) || null;
+  try { S.lastGood = JSON.parse(JSON.stringify(cfg)); } catch { S.lastGood = null; }
+}
 async function load() {
   try {
     const r = await fetch('/api/config');
     if (!r.ok) throw new Error(r.status);
     const d = await r.json();
-    S.cfg = d.config; S.clicks = d.clicks || {}; S.authed = !!d.authed; S.needsSetup = !!d.needsSetup;
+    adoptConfig(d.config, !!d.authed);
+    S.clicks = d.clicks || {}; S.authed = !!d.authed; S.needsSetup = !!d.needsSetup;
     localStorage.setItem('ymnav_cache', JSON.stringify(publicView(S.cfg)));
   } catch (e) {
+    // Cache fallback is for READING only. S.authed may already be true
+    // (login succeeded a moment ago, then this fetch failed) while the
+    // cache holds only the public subset — dataOk=false makes save()
+    // refuse, so the subset can never overwrite the full server config.
+    S.dataOk = false;
     const cache = localStorage.getItem('ymnav_cache');
     if (cache) { S.cfg = JSON.parse(cache); toast(T('网络异常，显示上次缓存', 'Offline, showing cache')); }
     else { S.cfg = { version: 1, settings: {}, sections: [] }; }
@@ -454,13 +483,34 @@ async function load() {
   if (!S.cfg.settings) S.cfg.settings = {};
 }
 async function save(silent) {
+  if (S.authed && !S.dataOk) {
+    toast(T('完整数据未加载成功，已禁止保存，请刷新页面重试', 'Full data not loaded — saving is disabled, please refresh'));
+    return false;
+  }
   try {
-    const r = await fetch('/api/config', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(S.cfg) });
-    if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || r.status);
+    const payload = { ...S.cfg, baseUpdatedAt: S.baseUpdatedAt };
+    const r = await fetch('/api/config', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(r.status === 409 ? '__conflict__' : (d.error || r.status));
+    if (d.updatedAt) { S.cfg.updatedAt = d.updatedAt; S.baseUpdatedAt = d.updatedAt; }
+    S.dataOk = true;
+    try { S.lastGood = JSON.parse(JSON.stringify(S.cfg)); } catch { /* keep older rollback target */ }
     localStorage.setItem('ymnav_cache', JSON.stringify(publicView(S.cfg)));
     if (!silent) toast(T('已保存', 'Saved'));
     return true;
-  } catch (e) { toast(T('保存失败：', 'Save failed: ') + e.message); return false; }
+  } catch (e) {
+    // Roll memory back to the last state known to match the server, so a
+    // failed save never leaves the page showing changes the server does
+    // not have (which a later successful save would silently push).
+    if (S.lastGood) {
+      S.cfg = JSON.parse(JSON.stringify(S.lastGood));
+      if (typeof render === 'function') render();
+    }
+    toast(e.message === '__conflict__'
+      ? T('保存失败：数据已在其他设备更新，已恢复为上次保存的状态', 'Save conflict: updated on another device — restored the last saved state')
+      : T('保存失败，已恢复为上次保存的状态：', 'Save failed, restored the last saved state: ') + e.message);
+    return false;
+  }
 }
 
 /* ---------------- settings / theme ---------------- */
@@ -533,8 +583,12 @@ function applyNameFit() {
   for (const el of els) {
     const w = el.clientWidth, sw = el.scrollWidth;
     if (w > 0 && sw > w) {
-      const fs = 14.5 * w / sw;
-      jobs.push([el, fs >= 11.5 ? fs : 0]); // 0 = switch this name to two-line display
+      // Scale from the element's REAL font size: horizontal tiles render
+      // at 14.5px but vertical tiles at 12.5px — a fixed 14.5 base made
+      // every vertical-tile name compute too large and still overflow.
+      const base = parseFloat(getComputedStyle(el).fontSize) || 14.5;
+      const fs = base * w / sw;
+      jobs.push([el, fs >= Math.max(9.5, base - 3) ? fs : 0]); // 0 = switch this name to two-line display
     }
   }
   for (const [el, fs] of jobs) { if (fs) el.style.fontSize = fs.toFixed(1) + 'px'; else el.classList.add('fit2'); }
@@ -805,15 +859,29 @@ $('#loginGo').addEventListener('click', async () => {
   const user = $('#loginUser').value.trim();
   if (!pwd) return;
   const url = S.needsSetup ? '/api/setup' : '/api/login';
-  try {
-    const r = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username: user, password: pwd }) });
+  const attempt = async (setupKey) => {
+    const r = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username: user, password: pwd, setupKey }) });
     const d = await r.json().catch(() => ({}));
     if (!r.ok) throw new Error(d.error || r.status);
+    return d;
+  };
+  try {
+    try {
+      await attempt('');
+    } catch (e1) {
+      // Deployments that set a SETUP_KEY ask for it before first-run
+      // setup; prompt once and retry. Not set on most deployments.
+      if (e1.message !== 'setup key required') throw e1;
+      const key = prompt(T('该部署启用了初始化口令，请输入部署时设置的 SETUP_KEY', 'This deployment requires the SETUP_KEY set at deploy time'));
+      if (!key) throw e1;
+      await attempt(key);
+    }
     S.authed = true; S.needsSetup = false;
     if (user) localStorage.setItem('ymnav_user', user);
     $('#mLogin').classList.remove('open');
     toast(T('登录成功', 'Logged in'));
     await load(); // re-fetch as admin: private sections/links only exist in the authed view
+    if (!S.dataOk) toast(T('已登录，但完整数据加载失败：当前只能浏览缓存，保存已禁用，请刷新页面', 'Logged in, but full data failed to load: cache-only browsing, saving disabled — please refresh'));
     render();
     if (S.pendingAdd) { const p = S.pendingAdd; S.pendingAdd = null; openLinkEditor(null, null, p); }
   } catch (e) { toast(e.message === 'wrong credentials' ? T('账号或密码不对', 'Wrong username or password') : T('失败：', 'Failed: ') + e.message); }
@@ -878,8 +946,13 @@ $('#linkSave').addEventListener('click', async () => {
   if (await save(true)) { toast(T('已保存', 'Saved')); render(); }
 });
 $('#linkDelete').addEventListener('click', async () => {
-  const sec = S.cfg.sections.find((s) => s.id === editCtx.secId);
-  const link = sec.links.find((l) => l.id === editCtx.linkId);
+  // Find the section that actually CONTAINS the link. editCtx.secId
+  // follows the category dropdown, so after the user changes the
+  // category in this dialog it points at the (empty-for-this-link)
+  // target section and the old code crashed on link.name.
+  const sec = S.cfg.sections.find((s) => (s.links || []).some((l) => l.id === editCtx.linkId));
+  const link = sec ? sec.links.find((l) => l.id === editCtx.linkId) : null;
+  if (!sec || !link) { $('#mLink').classList.remove('open'); return; }
   if (!confirm(T(`删除「${link.name}」？`, `Delete "${link.name}"?`))) return;
   sec.links = sec.links.filter((l) => l.id !== editCtx.linkId);
   $('#mLink').classList.remove('open');
@@ -985,7 +1058,14 @@ $('#abSettings').addEventListener('click', () => {
 $('#setSave').addEventListener('click', async () => {
   // Merge settings onto the LATEST server config first, so a stale in-memory
   // copy (e.g. loaded while logged out) can never wipe sections on save.
-  try { const d = await (await fetch('/api/config')).json(); if (d && d.config) S.cfg = d.config; } catch { /* keep in-memory copy */ }
+  // The fresh copy must be the AUTHED (complete) one: if the fetch failed
+  // or the session is gone, mark dataOk=false so save() refuses instead
+  // of writing a partial config back.
+  try {
+    const d = await (await fetch('/api/config')).json();
+    if (d && d.config && d.authed) adoptConfig(d.config, true);
+    else S.dataOk = false;
+  } catch { S.dataOk = false; }
   const st = S.cfg.settings;
   st.siteName = $('#setName').value.trim() || st.siteName; st.siteNameEn = $('#setNameEn').value.trim();
   if (!st.siteNameEn && st.siteName) { const t = await translateName(st.siteName); if (t) st.siteNameEn = t; }
@@ -1093,7 +1173,11 @@ function normUrl(u) {
     x.hash = '';
     let path = x.pathname;
     if (path.length > 1 && path.endsWith('/')) path = path.slice(0, -1);
-    return (x.protocol + '//' + x.host + path + x.search).toLowerCase();
+    // Only the scheme/host are case-insensitive (the URL parser has
+    // already lowercased them). The path and query ARE case-sensitive —
+    // lowercasing the whole string made genuinely different URLs
+    // (e.g. /User/A vs /user/a) collide in import dedupe and get dropped.
+    return x.protocol + '//' + x.host + path + x.search;
   } catch { return String(u).trim().toLowerCase().replace(/\/$/, ''); }
 }
 function allSeen() { return new Set(S.cfg.sections.flatMap((s) => s.links.map((l) => normUrl(l.url)))); }

@@ -1,7 +1,9 @@
 // Shared helpers for YM Nav (Cloudflare Pages Functions)
 // KV binding required: NAV_KV
 // KV keys: "site_config" (the whole site JSON), "clicks" ({linkId: count}),
-//          "admin" ({salt, hash}), "sess:<token>" (login sessions)
+//          "admin" ({username, salt, hash, ver}), "sess:<token>" (login
+//          sessions; the stored value is "v<admin.ver>" so that changing
+//          the password — which bumps ver — kills every older session)
 
 export function json(data, status = 200, extraHeaders = {}) {
   return new Response(JSON.stringify(data), {
@@ -38,16 +40,28 @@ export function sessionToken(request) {
   return m ? m[1] : null;
 }
 
+// Session version of an admin record. Records written before versioning
+// existed have no ver field and count as v1.
+export function adminVer(admin) {
+  const v = admin ? parseInt(admin.ver, 10) : NaN;
+  return Number.isInteger(v) && v >= 1 ? v : 1;
+}
+
 export async function isAuthed(request, env) {
   const token = sessionToken(request);
   if (!token) return false;
   const v = await env.NAV_KV.get('sess:' + token);
-  return !!v;
+  if (!v) return false;
+  const expect = adminVer(await getAdmin(env));
+  if (v === 'v' + expect) return true;
+  // Legacy sessions stored a plain '1' before versioning; they count as v1
+  // and die on the first password change like everyone else.
+  return expect === 1 && v === '1';
 }
 
 export async function createSession(env) {
   const token = randomHex(24);
-  await env.NAV_KV.put('sess:' + token, '1', { expirationTtl: 7 * 24 * 3600 });
+  await env.NAV_KV.put('sess:' + token, 'v' + adminVer(await getAdmin(env)), { expirationTtl: 7 * 24 * 3600 });
   return token;
 }
 

@@ -241,6 +241,52 @@ export async function safeFetch(input, init = {}, opts = {}) {
   }
 }
 
+// Read a response body with a hard byte cap AND a wall-clock deadline,
+// enforced WHILE streaming. safeFetch's timeout only covers connect +
+// headers + the redirect chain — it is cleared the moment the final
+// response arrives, so a hostile or broken server could previously
+// trickle an endless / gigantic body into r.text() / r.arrayBuffer()
+// with nothing bounding time or memory. This reader cancels the stream
+// as soon as either budget is blown. Returns an ArrayBuffer.
+export async function readBodyLimited(res, { maxBytes = 1024 * 1024, timeoutMs = 10000 } = {}) {
+  if (!res || !res.body || typeof res.body.getReader !== 'function') {
+    const buf = await res.arrayBuffer();
+    if (buf.byteLength > maxBytes) throw new Error('body too large');
+    return buf;
+  }
+  const reader = res.body.getReader();
+  const chunks = [];
+  let total = 0;
+  const deadline = Date.now() + timeoutMs;
+  try {
+    for (;;) {
+      const remain = deadline - Date.now();
+      if (remain <= 0) throw new Error('body timeout');
+      let timer = null;
+      let step;
+      try {
+        step = await Promise.race([
+          reader.read(),
+          new Promise((_, rej) => { timer = setTimeout(() => rej(new Error('body timeout')), remain); }),
+        ]);
+      } finally {
+        if (timer) clearTimeout(timer);
+      }
+      if (step.done) break;
+      total += step.value.byteLength;
+      if (total > maxBytes) throw new Error('body too large');
+      chunks.push(step.value);
+    }
+  } catch (e) {
+    try { await reader.cancel(); } catch { /* ignore */ }
+    throw e;
+  }
+  const out = new Uint8Array(total);
+  let off = 0;
+  for (const c of chunks) { out.set(c, off); off += c.byteLength; }
+  return out.buffer;
+}
+
 // In-memory rate-limit gate (per isolate): same state shape (count +
 // window start + lock-until), same 15-min window, same 15-min lock.
 // Only the counted event and the threshold differ per endpoint, because
