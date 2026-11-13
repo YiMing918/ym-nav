@@ -922,6 +922,8 @@ function openLinkEditor(secId, linkId, prefill) {
   $('#fIcon').value = link ? (link.icon || '') : '';
   $('#fColor').value = link ? (link.color || '') : '';
   $('#linkDelete').style.display = link ? '' : 'none';
+  if (linkDelArm) { clearTimeout(linkDelArm); linkDelArm = null; }
+  $('#linkDelete').textContent = T('删除', 'Delete');
   open('#mLink');
 }
 $('#fSection').addEventListener('change', () => { editCtx.secId = $('#fSection').value; });
@@ -945,6 +947,7 @@ $('#linkSave').addEventListener('click', async () => {
   $('#mLink').classList.remove('open');
   if (await save(true)) { toast(T('已保存', 'Saved')); render(); }
 });
+let linkDelArm = null;
 $('#linkDelete').addEventListener('click', async () => {
   // Find the section that actually CONTAINS the link. editCtx.secId
   // follows the category dropdown, so after the user changes the
@@ -953,7 +956,18 @@ $('#linkDelete').addEventListener('click', async () => {
   const sec = S.cfg.sections.find((s) => (s.links || []).some((l) => l.id === editCtx.linkId));
   const link = sec ? sec.links.find((l) => l.id === editCtx.linkId) : null;
   if (!sec || !link) { $('#mLink').classList.remove('open'); return; }
-  if (!confirm(T(`删除「${link.name}」？`, `Delete "${link.name}"?`))) return;
+  // Confirmation is a second tap on this same button, NOT window.confirm:
+  // some in-app browsers / WebViews swallow native confirm() entirely
+  // (it returns false without ever showing a dialog), which made this
+  // button look completely dead. Same pattern as the vtAllBtn confirm.
+  const btn = $('#linkDelete');
+  if (!linkDelArm) {
+    btn.textContent = T(`再点一次确认删除「${link.name}」`, `Click again to delete "${link.name}"`);
+    linkDelArm = setTimeout(() => { linkDelArm = null; btn.textContent = T('删除', 'Delete'); }, 3500);
+    return;
+  }
+  clearTimeout(linkDelArm); linkDelArm = null;
+  btn.textContent = T('删除', 'Delete');
   sec.links = sec.links.filter((l) => l.id !== editCtx.linkId);
   $('#mLink').classList.remove('open');
   if (await save(true)) { toast(T('已删除', 'Deleted')); render(); }
@@ -987,6 +1001,8 @@ function openSectionEditor(sec) {
   $('#sCardStyle').value = sec ? secStyle(sec) : 'vt';
   $('#sPrivate').checked = sec ? !!sec.private : false;
   $('#secDelete').style.display = sec ? '' : 'none';
+  if (secDelArm) { clearTimeout(secDelArm); secDelArm = null; }
+  $('#secDelete').textContent = T('删除分类', 'Delete category');
   open('#mSection');
 }
 $('#secSave').addEventListener('click', async () => {
@@ -999,9 +1015,20 @@ $('#secSave').addEventListener('click', async () => {
   $('#mSection').classList.remove('open');
   if (await save(true)) { toast(T('已保存', 'Saved')); render(); }
 });
+let secDelArm = null;
 $('#secDelete').addEventListener('click', async () => {
   const sec = S.cfg.sections.find((s) => s.id === secCtx.id);
-  if (!confirm(T(`删除分类「${sec.title}」及其 ${sec.links.length} 个网站？`, `Delete category "${sec.title}" and its ${sec.links.length} sites?`))) return;
+  if (!sec) { $('#mSection').classList.remove('open'); return; }
+  // Second-tap confirmation instead of window.confirm — see linkDelete
+  // for why (native confirm is swallowed by some in-app browsers).
+  const btn = $('#secDelete');
+  if (!secDelArm) {
+    btn.textContent = T(`再点一次确认：删除「${sec.title}」及 ${sec.links.length} 个网站`, `Click again: delete "${sec.title}" and its ${sec.links.length} sites`);
+    secDelArm = setTimeout(() => { secDelArm = null; btn.textContent = T('删除分类', 'Delete category'); }, 3500);
+    return;
+  }
+  clearTimeout(secDelArm); secDelArm = null;
+  btn.textContent = T('删除分类', 'Delete category');
   S.cfg.sections = S.cfg.sections.filter((s) => s.id !== secCtx.id);
   $('#mSection').classList.remove('open');
   if (await save(true)) { toast(T('已删除', 'Deleted')); render(); }
@@ -1188,6 +1215,8 @@ function appendLink(sec, link, seen) {
   if (seen) seen.add(n);
   return true;
 }
+let impArm = null;
+$('#impFile').addEventListener('change', () => { impArm = null; $('#impGo').textContent = T('开始导入', 'Import'); });
 $('#impGo').addEventListener('click', async () => {
   const f = $('#impFile').files[0];
   if (!f) { toast(T('先选文件', 'Choose a file first')); return; }
@@ -1195,9 +1224,21 @@ $('#impGo').addEventListener('click', async () => {
   const lower = f.name.toLowerCase();
   try {
     if (lower.endsWith('.json')) {
-      const obj = JSON.parse(text);
-      if (!obj || !Array.isArray(obj.sections)) throw new Error('JSON 里没有 sections');
-      if (!confirm(T(`将用文件里的 ${obj.sections.length} 个分类整体替换当前数据，继续？`, 'Replace all data with this file?'))) return;
+      // Whole-config replace is destructive. Its confirmation used to be
+      // window.confirm, which some in-app browsers swallow (import then
+      // silently did nothing) — so the first tap only arms the button
+      // and a second tap on it confirms, like the delete buttons.
+      const key = f.name + ':' + f.size + ':' + f.lastModified;
+      if (!impArm || impArm.key !== key) {
+        const obj = JSON.parse(text);
+        if (!obj || !Array.isArray(obj.sections)) throw new Error('JSON 里没有 sections');
+        impArm = { key, obj };
+        $('#impGo').textContent = T(`再点一次确认导入：将整体替换为 ${obj.sections.length} 个分类`, 'Click again to confirm replace-all import');
+        toast(T('JSON 导入会整体替换当前数据，确认无误请再点一次导入按钮', 'JSON import replaces ALL data — tap Import again to confirm'));
+        return;
+      }
+      const obj = impArm.obj; impArm = null;
+      $('#impGo').textContent = T('开始导入', 'Import');
       obj.settings = { ...(S.cfg.settings || {}), ...(obj.settings || {}) };
       S.cfg = obj;
     } else if (lower.endsWith('.csv')) {
