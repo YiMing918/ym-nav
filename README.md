@@ -555,7 +555,7 @@
 
 1. 手机浏览器打开本仓库的发行版页：github.com/YiMing918/ym-nav/releases（或点仓库首页右侧的 Releases）。
 2. 找到带 **Latest（最新）** 标记的那一版，点开它。
-3. 在 **Assets（附件）** 列表里点 `ym-nav-deploy-20261114.zip` 这个名字（日期可能更新，认准 `ym-nav-deploy-` 开头），浏览器会开始下载。**不要下 Source code (zip)**，那是源码快照不能直传（见「先选下载文件」）。
+3. 在 **Assets（附件）** 列表里点 `ym-nav-deploy-*.zip` 这个名字（日期可能更新，认准 `ym-nav-deploy-` 开头），浏览器会开始下载。**不要下 Source code (zip)**，那是源码快照不能直传（见「先选下载文件」）。
 4. （可选）同页还有 `SHA256SUMS.txt`，想核对文件完整性就一并下，用校验工具算 zip 的 SHA-256 和它对上。
 
 做到这里你应该看到：手机下载列表里躺着一个几十 KB 的 `ym-nav-deploy-*.zip` 文件。
@@ -661,7 +661,7 @@ npx wrangler login
 **第 3 步：部署**
 
 ```bash
-npx wrangler pages deploy. --project-name ym-nav
+npx wrangler pages deploy . --project-name ym-nav
 ```
 
 - `.` 表示把当前目录整个作为网站根目录上传。
