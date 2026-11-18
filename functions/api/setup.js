@@ -26,6 +26,14 @@ export async function onRequestPost({ request, env }) {
     const salt = randomHex(16);
     const hash = await hashPassword(password, salt);
     await env.NAV_KV.put('admin', JSON.stringify({ username, salt, hash, ver: 1 }));
+    // 【C-28 低风险版】写后回读比对：首次设置是「先查后写」，两个并发
+    // 首次设置都查到无 admin 时，后写会覆盖先写、而先写的人还拿着
+    // 有效会话。回读发现 admin 不是自己刚写的这份（盐/哈希对不上）
+    // 就报错、不发会话，让输的一方明确知道要重新登录确认。
+    const check = await getAdmin(env);
+    if (!check || check.salt !== salt || check.hash !== hash) {
+      return json({ error: 'setup conflict, please reload and sign in to confirm' }, 409);
+    }
     const token = await createSession(env);
     return json({ ok: true, created: true }, 200, { 'Set-Cookie': sessionCookie(token) });
   }

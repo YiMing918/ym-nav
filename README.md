@@ -2,7 +2,7 @@
 
 一个为自己使用习惯写的个人网址导航站：界面清爽、后台顺手、数据完全归自己。基于 **Cloudflare Pages + Pages Functions + Workers KV** 构建，全部运行在免费额度内，无需服务器、无需数据库。
 
-![版本](https://img.shields.io/badge/版本-v2.1.1-blue) ![Cloudflare Pages](https://img.shields.io/badge/Cloudflare-Pages-F38020?logo=cloudflare&logoColor=white) ![Workers KV](https://img.shields.io/badge/Storage-Workers_KV-F38020) ![Pages Functions](https://img.shields.io/badge/Backend-Pages_Functions-orange) ![JavaScript](https://img.shields.io/badge/JavaScript-单文件前端-F7DF1E?logo=javascript&logoColor=black) ![Free](https://img.shields.io/badge/费用-免费额度-3fb950)
+![版本](https://img.shields.io/badge/版本-v2.1.2-blue) ![Cloudflare Pages](https://img.shields.io/badge/Cloudflare-Pages-F38020?logo=cloudflare&logoColor=white) ![Workers KV](https://img.shields.io/badge/Storage-Workers_KV-F38020) ![Pages Functions](https://img.shields.io/badge/Backend-Pages_Functions-orange) ![JavaScript](https://img.shields.io/badge/JavaScript-单文件前端-F7DF1E?logo=javascript&logoColor=black) ![Free](https://img.shields.io/badge/费用-免费额度-3fb950)
 
 **[下载最新版](https://github.com/YiMing918/ym-nav/releases/latest) · [博客教程](https://bk.ymaym.top/post/ym-nav-guide)**
 
@@ -1239,6 +1239,13 @@ KV 内部 key 一览：
 
 
 ## 📝 更新日志
+### v2.1.2 · 2026-11-18
+
+- **点击计数写前重读合并**（对抗复读核验后修复）：/api/click 此前是整表读-改-写——读到写回之间别的请求刚落盘的计数会被整表覆盖吞掉。现写回前重读最新 clicks，若已被改动就把本请求的增量重新合并到最新值上再写（照 ym-dash 历史合并的口径）；限流与单次计数上限等规则不变。
+- **登录耗时拉平**：用户名不对时也照样跑一遍口令哈希再判失败，不再用响应快慢漏出真实用户名（与 ym-cf-panel 同批同改法）。
+- **首次设置补写后回读比对**：首次设置「先查后写」在并发首设时后写会覆盖先写、输的一方还拿着有效会话。现写完回读比对，不是自己写的那份就报错且不发会话。
+- 新增 tests/c-fixes.mjs 7 项（改前 4 项失败复现、改后全过）；自带 ssrf 12/12、auth-session 5/5 不回归。
+
 ### v2.1.1 · 2026-11-18
 
 - **会话键名改存令牌哈希**（外部审计核验后修复）：KV 键由 `sess:<令牌原文>` 改为 `sess:<sha256(令牌)>`，Cookie 里仍放原文。KV 读面万一泄露，键名不再是可直接复用的会话令牌（与 ym-blog 的 token_hash 做法对齐）。代价：升级后存量会话自动失效，站长重登一次即可。

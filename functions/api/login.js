@@ -37,8 +37,12 @@ export async function onRequestPost({ request, env }) {
     rlRecordFail(ip);
     return json({ error: 'wrong credentials' }, 403);
   };
-  if (admin.username && username !== admin.username) return fail();
-  if (!(await verifyPassword(password, admin))) return fail();
+  // 【C-29 修复】用户名与口令分开验：用户名不对时也照样跑一遍口令
+  // 哈希再判失败，避免「用户名错 → 立刻返回、用户名对 → 慢」的耗时
+  // 差把真实用户名漏出去（旧版第一行命中就短路、不跑哈希）。
+  const userOk = !admin.username || username === admin.username;
+  const passOk = await verifyPassword(password, admin);
+  if (!userOk || !passOk) return fail();
   // 旧版单轮 SHA-256 哈希在登录成功时顺手升级为 PBKDF2（盐不变，其余字段原样）
   if (isLegacyHash(admin)) {
     try {

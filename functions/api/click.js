@@ -62,6 +62,22 @@ export async function onRequestPost({ request, env }) {
     applied++;
   }
   if (!applied) return json({ error: 'unknown id' }, 400);
+  // 【C-22 修复】写前重读合并（照 ym-dash histall 的合并口径）：上面读
+  // 到写回之间，别的请求可能刚落盘了新计数，拿手里这份旧值整表写回
+  // 会把对方的增量吞掉。写回前重读最新 clicks，若与初读不同，就把
+  // 本请求的增量重新合并到最新值上再写。
+  const rawLatest = await env.NAV_KV.get('clicks');
+  if (rawLatest !== raw) {
+    let latest = null;
+    if (rawLatest) { try { latest = JSON.parse(rawLatest); } catch { latest = null; } }
+    if (latest && typeof latest === 'object') {
+      for (const [id, n] of Object.entries(delta)) {
+        if (!validIds.has(id)) continue;
+        latest[id] = (latest[id] || 0) + n;
+      }
+      clicks = latest;
+    }
+  }
   await env.NAV_KV.put('clicks', JSON.stringify(clicks));
   const out = { ok: true };
   if (singleId) out.count = clicks[singleId];
