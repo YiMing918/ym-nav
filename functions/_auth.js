@@ -1,9 +1,13 @@
 // Shared helpers for YM Nav (Cloudflare Pages Functions)
 // KV binding required: NAV_KV
 // KV keys: "site_config" (the whole site JSON), "clicks" ({linkId: count}),
-//          "admin" ({username, salt, hash, ver}), "sess:<token>" (login
-//          sessions; the stored value is "v<admin.ver>" so that changing
-//          the password — which bumps ver — kills every older session)
+//          "admin" ({username, salt, hash, ver}), "sess:<sha256(token)>"
+//          (login sessions; the stored value is "v<admin.ver>" so that
+//          changing the password — which bumps ver — kills every older
+//          session. Key holds only the token's SHA-256, cookie keeps the
+//          raw token: a leaked KV dump no longer hands out usable session
+//          tokens as key names — same approach as ym-blog's token_hash.
+//          Pre-change "sess:<token>" sessions simply miss and expire.)
 
 export function json(data, status = 200, extraHeaders = {}) {
   return new Response(JSON.stringify(data), {
@@ -79,6 +83,13 @@ export function sessionToken(request) {
   return m ? m[1] : null;
 }
 
+// Session KV key: "sess:" + sha256(token). See header note — the raw
+// token only ever lives in the cookie, never in a KV key name.
+export async function sessionKey(token) {
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(token));
+  return 'sess:' + [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, '0')).join('');
+}
+
 // Session version of an admin record. Records written before versioning
 // existed have no ver field and count as v1.
 export function adminVer(admin) {
@@ -89,7 +100,7 @@ export function adminVer(admin) {
 export async function isAuthed(request, env) {
   const token = sessionToken(request);
   if (!token) return false;
-  const v = await env.NAV_KV.get('sess:' + token);
+  const v = await env.NAV_KV.get(await sessionKey(token));
   if (!v) return false;
   const expect = adminVer(await getAdmin(env));
   if (v === 'v' + expect) return true;
@@ -100,7 +111,7 @@ export async function isAuthed(request, env) {
 
 export async function createSession(env) {
   const token = randomHex(24);
-  await env.NAV_KV.put('sess:' + token, 'v' + adminVer(await getAdmin(env)), { expirationTtl: 7 * 24 * 3600 });
+  await env.NAV_KV.put(await sessionKey(token), 'v' + adminVer(await getAdmin(env)), { expirationTtl: 7 * 24 * 3600 });
   return token;
 }
 

@@ -2,7 +2,7 @@
 
 一个为自己使用习惯写的个人网址导航站：界面清爽、后台顺手、数据完全归自己。基于 **Cloudflare Pages + Pages Functions + Workers KV** 构建，全部运行在免费额度内，无需服务器、无需数据库。
 
-![版本](https://img.shields.io/badge/版本-v2.1-blue) ![Cloudflare Pages](https://img.shields.io/badge/Cloudflare-Pages-F38020?logo=cloudflare&logoColor=white) ![Workers KV](https://img.shields.io/badge/Storage-Workers_KV-F38020) ![Pages Functions](https://img.shields.io/badge/Backend-Pages_Functions-orange) ![JavaScript](https://img.shields.io/badge/JavaScript-单文件前端-F7DF1E?logo=javascript&logoColor=black) ![Free](https://img.shields.io/badge/费用-免费额度-3fb950)
+![版本](https://img.shields.io/badge/版本-v2.1.1-blue) ![Cloudflare Pages](https://img.shields.io/badge/Cloudflare-Pages-F38020?logo=cloudflare&logoColor=white) ![Workers KV](https://img.shields.io/badge/Storage-Workers_KV-F38020) ![Pages Functions](https://img.shields.io/badge/Backend-Pages_Functions-orange) ![JavaScript](https://img.shields.io/badge/JavaScript-单文件前端-F7DF1E?logo=javascript&logoColor=black) ![Free](https://img.shields.io/badge/费用-免费额度-3fb950)
 
 **[打开站点](https://nav.ymaym.top) · [下载最新版](https://github.com/YiMing918/ym-nav/releases/latest) · [博客教程](https://bk.ymaym.top/post/ym-nav-guide)**
 
@@ -1239,6 +1239,11 @@ KV 内部 key 一览：
 
 
 ## 📝 更新日志
+### v2.1.1 · 2026-11-18
+
+- **会话键名改存令牌哈希**（外部审计核验后修复）：KV 键由 `sess:<令牌原文>` 改为 `sess:<sha256(令牌)>`，Cookie 里仍放原文。KV 读面万一泄露，键名不再是可直接复用的会话令牌（与 ym-blog 的 token_hash 做法对齐）。代价：升级后存量会话自动失效，站长重登一次即可。
+- **给 SSRF 守卫补定向测试**：新增 tests/ssrf.test.mjs（12 项，fetchImpl 注入不发真请求：127.0.0.1 / ::1 / 169.254.169.254 直连拦截、公网 302 跳内网逐跳拦截、跳转超上限、超长 body 流式截断、公网放行）与 tests/auth-session.test.mjs（5 项：哈希键落库 / 键不含原文 / Cookie 鉴权 / 退出删键），全过。
+
 ### 文档修订 · 2026-11-14（第二轮增补）
 
 - **在第一轮重写的基础上补「全生命周期」内容（纯文档，不升版本号，代码仍为 v2.1）**：新增「出事了怎么办（丢了 / 坏了 / 删了）」整节——KV 命名空间被删、绑定改错、Pages 项目被删、管理员密码忘了、`SETUP_KEY` 丢了 / 泄露、域名过期、GitHub 仓库被删、导入坏备份，逐样写清后果、能不能重建、重建步骤和预防；另补「总共要花多少钱」「手机能干什么、什么必须用电脑」「安全提醒」「部署完初始化清单」「术语速查表」五小节。
