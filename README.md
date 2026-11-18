@@ -4,7 +4,7 @@
 
 ![版本](https://img.shields.io/badge/版本-v2.1.1-blue) ![Cloudflare Pages](https://img.shields.io/badge/Cloudflare-Pages-F38020?logo=cloudflare&logoColor=white) ![Workers KV](https://img.shields.io/badge/Storage-Workers_KV-F38020) ![Pages Functions](https://img.shields.io/badge/Backend-Pages_Functions-orange) ![JavaScript](https://img.shields.io/badge/JavaScript-单文件前端-F7DF1E?logo=javascript&logoColor=black) ![Free](https://img.shields.io/badge/费用-免费额度-3fb950)
 
-**[打开站点](https://nav.ymaym.top) · [下载最新版](https://github.com/YiMing918/ym-nav/releases/latest) · [博客教程](https://bk.ymaym.top/post/ym-nav-guide)**
+**[下载最新版](https://github.com/YiMing918/ym-nav/releases/latest) · [博客教程](https://bk.ymaym.top/post/ym-nav-guide)**
 
 > 本项目为个人自用而作，**不提供在线体验**：演示站必然要放真实收藏，收藏是私人的。
 > 想看效果请看下方「效果预览」（示例数据渲染），或按本文的部署章节一步步搭一个自己的——全文按完全没用过 Cloudflare / GitHub 的新手写的，每一步都拆到点哪个按钮、填什么。
@@ -194,7 +194,7 @@
 
 ### 3. 一个你自己的域名（可选，但推荐）
 
-**是什么**：域名就是网址里 `nav.ymaym.top` 这种名字。不绑自己的域名也能部署：CF 会免费送你一个 `你的项目名.pages.dev` 的地址，功能完全一样。只有想用自己网址访问时才需要域名。
+**是什么**：域名就是网址里 `nav.example.com` 这种名字。不绑自己的域名也能部署：CF 会免费送你一个 `你的项目名.pages.dev` 的地址，功能完全一样。只有想用自己网址访问时才需要域名。
 
 **去哪弄**：在任何域名注册商都能买（例如 Cloudflare 自己的 Registrar、西部数码、Namesilo 等，挑你顺手的）。价格看后缀，一般一年几十元。买完先放着，部署到「绑自定义域名」那步再用。
 
