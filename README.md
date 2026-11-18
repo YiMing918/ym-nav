@@ -2,7 +2,7 @@
 
 一个为自己使用习惯写的个人网址导航站：界面清爽、后台顺手、数据完全归自己。基于 **Cloudflare Pages + Pages Functions + Workers KV** 构建，全部运行在免费额度内，无需服务器、无需数据库。
 
-![版本](https://img.shields.io/badge/版本-v2.1.2-blue) ![Cloudflare Pages](https://img.shields.io/badge/Cloudflare-Pages-F38020?logo=cloudflare&logoColor=white) ![Workers KV](https://img.shields.io/badge/Storage-Workers_KV-F38020) ![Pages Functions](https://img.shields.io/badge/Backend-Pages_Functions-orange) ![JavaScript](https://img.shields.io/badge/JavaScript-单文件前端-F7DF1E?logo=javascript&logoColor=black) ![Free](https://img.shields.io/badge/费用-免费额度-3fb950)
+![版本](https://img.shields.io/badge/版本-v2.1.3-blue) ![Cloudflare Pages](https://img.shields.io/badge/Cloudflare-Pages-F38020?logo=cloudflare&logoColor=white) ![Workers KV](https://img.shields.io/badge/Storage-Workers_KV-F38020) ![Pages Functions](https://img.shields.io/badge/Backend-Pages_Functions-orange) ![JavaScript](https://img.shields.io/badge/JavaScript-单文件前端-F7DF1E?logo=javascript&logoColor=black) ![Free](https://img.shields.io/badge/费用-免费额度-3fb950)
 
 **[下载最新版](https://github.com/YiMing918/ym-nav/releases/latest) · [博客教程](https://bk.ymaym.top/post/ym-nav-guide)**
 
@@ -71,7 +71,8 @@
 | 部署方式 | 下载什么 | 怎么用 |
 | --- | --- | --- |
 | 方式一：Git 连接自动部署（推荐） | **什么都不用下载** | 在 GitHub 上把本仓库 Fork（复刻一份到你账号下）或克隆，Cloudflare 直接连你的仓库读代码部署，步骤见「方式一」 |
-| 方式二：手机部署包（直接上传） | 本仓库 [Releases（发行版）](https://github.com/YiMing918/ym-nav/releases/latest) 里的 **`ym-nav-deploy-*.zip`** | 在 Cloudflare 控制台新建 Pages 项目时选「上传资产」，把这个 zip 原样传上去（不用解压，zip 根目录就是站点根目录），步骤见「方式二」 |
+| 方式二：手机部署包（直接上传） | 本仓库 [Releases（发行版）](https://github.com/YiMing918/ym-nav/releases/latest) 里的 **`ym-nav-worker-deploy-*.zip`**（带 `-worker-` 的那个，直传专用） | 在 Cloudflare 控制台新建 Pages 项目时选「上传资产」，把这个 zip 原样传上去（不用解压，zip 根目录就是站点根目录），步骤见「方式二」 |
+| （别下错）普通部署包 | 发行版里的 **`ym-nav-deploy-*.zip`**（不带 `-worker-`） | 这是给方式一 / 方式三用的包（Git 连接、wrangler 部署时平台会编译它的后端文件）。**千万别拿它去控制台直接上传**：控制台拖拽上传不会编译后端文件，传了必坏（网页能开、登录和数据全不工作），原因见「方式二」开头 |
 | 方式三：wrangler 命令行 | 本仓库的代码（Git 克隆，或仓库页 Code → Download ZIP 下载后解压） | 在电脑上用命令行把整个项目目录推到 Cloudflare，步骤见「方式三」 |
 | 校验部署包（可选） | 发行版里同页的 **`SHA256SUMS.txt`** | 里面记着 zip 的 SHA-256 指纹，用来核对你下到的 zip 和发布的一模一样、没损坏没被掉包；手机或电脑上用任意 SHA-256 校验工具算一遍 zip 的值，和文件里的对上即可 |
 
@@ -246,7 +247,7 @@
 | 上手难度 | 中等：步骤最多，但每步都在网页上点选 | 最低：下载一个 zip、上传、完事 | 最高：要装 Node.js、敲命令 |
 | 第一次大约耗时 | 约 10–20 分钟（含注册、Fork、授权、绑 KV） | 约 5–10 分钟 | 约 10 分钟（不含装 Node.js 的时间） |
 | 日常更新方不方便 | **最方便**：仓库里改完一推送就自动上线，什么都不用再管 | 不方便：每次更新都要下新包、去控制台重新上传一次 | 一般：改完在项目目录把部署命令再跑一遍 |
-| 出错了好不好排查 | 好排查：部署记录、日志都在控制台里，失败能一键回滚到上一版 | **最难排查**：直传偶发不生成 Functions，现象还很迷惑（网页能开、数据不工作），只能靠 `/api/config` 自检确认 | 好排查：命令在你自己的终端里报错，错在哪一行看得见 |
+| 出错了好不好排查 | 好排查：部署记录、日志都在控制台里，失败能一键回滚到上一版 | **最难排查**：直传必须用对 `-worker-` 专用包；用错普通包时后端必然不生成，现象还很迷惑（网页能开、数据不工作），只能靠 `/api/config` 自检确认 | 好排查：命令在你自己的终端里报错，错在哪一行看得见 |
 | 跟随上游更新 | 方便：Fork 点 Sync fork（或加自动同步工作流）后自动部署 | 手动：下新版部署包重新上传 | 手动：拉新代码后重跑命令 |
 | 适合谁 | **大多数人**，尤其是想长期用、以后还会升级的人 | 没电脑临时救急、或方式一坏掉时先顶上的人 | 电脑在手边、本来就习惯命令行的人 |
 
@@ -527,7 +528,7 @@
 
 ## 方式二：手机部署包（直接上传）
 
-不经过 Git，把现成的部署包 zip 直接传到 CF。适合只有手机、或者方式一出问题时救急。**先说清一个实测教训**：少数情况下直传部署不会生成 Functions（表现为网页正常、但登录和数据都不工作）；遇到就按本节末尾的自检确认，中招了改用方式一。所以这一路是备选，不是首选。
+不经过 Git，把现成的部署包 zip 直接传到 CF。适合只有手机、或者方式一出问题时救急。**先说清一个平台规矩（实测教训）**：Cloudflare 控制台的拖拽上传**不会编译后端文件（functions 文件夹）**——这是平台的明确限制，**必然如此、不是偶发**，重试部署也没用。所以直传必须用发行版里带 `-worker-` 的专用包：它的后端已经提前合成进一个 `_worker.js` 文件（拖拽上传支持这种），传上去就能正常用。要是下错了不带 `-worker-` 的普通包，传上去必然是网页能开、但登录和数据都不工作。部署完按本节末尾做一次自检确认即可。
 
 **优势**
 
@@ -536,13 +537,13 @@
 
 **劣势**
 
-- **有直传不生成 Functions 的偶发坑**（见上方实测教训）：部署完必须做一次 `/api/config` 自检确认，不能传完就走。
+- **必须用对包**（见上方平台规矩）：直传只认带 `-worker-` 的专用包，下错普通包必坏；部署完必须做一次 `/api/config` 自检确认，不能传完就走。
 - **没有自动更新**：以后每次升级都要重新下新包、去控制台再传一次；也看不到方式一那种逐次部署记录，排查和回滚都更麻烦。
 
 ### 【要用到的东西】
 
 - **CF 账号**（手机上能登录控制台即可）。
-- **部署包 zip**：本仓库 Releases（发行版）里的 `ym-nav-deploy-*.zip`（下载点法见步骤第 1 步；发行版和「版本发布页」是同一个东西，GitHub 把每个版本的下载页叫 Release）。
+- **部署包 zip**：本仓库 Releases（发行版）里的 `ym-nav-worker-deploy-*.zip`（带 `-worker-` 的直传专用包，下载点法见步骤第 1 步；发行版和「版本发布页」是同一个东西，GitHub 把每个版本的下载页叫 Release）。发行版里还有一个不带 `-worker-` 的 `ym-nav-deploy-*.zip`，那是给方式一 / 方式三用的，**别下错**。
 - CF 里要建的东西：一个 Pages 项目、一个 KV 命名空间（通用操作 A）。
 - 不需要 GitHub 账号，不需要密钥令牌。
 
@@ -555,10 +556,10 @@
 
 1. 手机浏览器打开本仓库的发行版页：github.com/YiMing918/ym-nav/releases（或点仓库首页右侧的 Releases）。
 2. 找到带 **Latest（最新）** 标记的那一版，点开它。
-3. 在 **Assets（附件）** 列表里点 `ym-nav-deploy-*.zip` 这个名字（日期可能更新，认准 `ym-nav-deploy-` 开头），浏览器会开始下载。**不要下 Source code (zip)**，那是源码快照不能直传（见「先选下载文件」）。
+3. 在 **Assets（附件）** 列表里点 `ym-nav-worker-deploy-*.zip` 这个名字（日期可能更新，认准 `ym-nav-worker-deploy-` 开头、带 `-worker-`），浏览器会开始下载。**不要下成不带 `-worker-` 的 `ym-nav-deploy-*.zip`**（那是给 Git / wrangler 用的，直传必坏），也**不要下 Source code (zip)**，那是源码快照不能直传（见「先选下载文件」）。
 4. （可选）同页还有 `SHA256SUMS.txt`，想核对文件完整性就一并下，用校验工具算 zip 的 SHA-256 和它对上。
 
-做到这里你应该看到：手机下载列表里躺着一个几十 KB 的 `ym-nav-deploy-*.zip` 文件。
+做到这里你应该看到：手机下载列表里躺着一个几十 KB 的 `ym-nav-worker-deploy-*.zip` 文件。
 
 **第 2 步：创建 Pages 项目并上传**
 
@@ -585,7 +586,7 @@
 
 **第 6 步：立刻自检 Functions 在不在**
 
-在浏览器打开 `https://你的项目名.pages.dev/api/config`：返回一屏 JSON 才算数；若返回的是网页内容，说明这次直传没生成 Functions——登录和存数据都会不工作。处理：先在 **部署** 页重试部署一次再看；仍不行就改用方式一（Git 连接）部署，那条路没有这个问题。
+在浏览器打开 `https://你的项目名.pages.dev/api/config`：返回一屏 JSON 才算数；若返回的是网页内容，说明后端没生成——登录和存数据都会不工作。最常见的原因就是**下错了包**（下成不带 `-worker-` 的普通包了，控制台拖拽上传不会编译它的后端文件，重试部署多少次都没用）。处理：回发行版下带 `-worker-` 的 `ym-nav-worker-deploy-*.zip`，在项目页 **部署** → **创建新部署** 重新上传一次；实在不行就改用方式一（Git 连接）部署，那条路没有这个问题。
 
 </details>
 
@@ -599,10 +600,10 @@
 ### 【常见问题】
 
 **上传后首页打开是空白或 404？**
-八成是 zip 结构不对：传的必须是发行版那个 `ym-nav-deploy-*.zip` 本体。不要下 Source code zip，也不要自己把源码文件夹重新打包（容易多套一层仓库名文件夹，站点根目录就错位了）。
+八成是 zip 结构不对：传的必须是发行版那个 `ym-nav-worker-deploy-*.zip` 本体。不要下 Source code zip，也不要自己把源码文件夹重新打包（容易多套一层仓库名文件夹，站点根目录就错位了）。
 
 **能打开网页，但登录、保存都不工作？**
-就是上面说的 Functions 没生成：`/api/config` 自检能确认。重试部署无效的话，改用方式一。
+就是上面说的后端没生成：`/api/config` 自检能确认。九成是下错了包（下成不带 `-worker-` 的普通包）——换 `-worker-` 专用包重新上传一次就好；包没下错还不行，再改用方式一。
 
 **改了代码想更新怎么办？**
 直传方式没有自动更新：下新版部署包 zip，在项目页 **部署** → **创建新部署** 再传一次（KV 绑定和域名都还在，不用重做，数据也不受影响）。
@@ -1239,6 +1240,11 @@ KV 内部 key 一览：
 
 
 ## 📝 更新日志
+### v2.1.3 · 2026-11-18
+
+- **新增 `-worker-` 直传专用包，修好「手机部署包直接上传」这条路**：此前的方式二有个必然踩的坑——Cloudflare 控制台拖拽上传不会编译后端文件（functions 文件夹），普通部署包直传上去必然是网页能开、登录和数据全坏（旧文档把这写成「偶发」并让重试部署，都是错的，本版一并改对）。现在每次发版会多产出一个 `ym-nav-worker-deploy-*.zip`：后端提前合成进单个 `_worker.js`（拖拽上传官方支持这种），直传即可用；原 functions 源码一字未改，合成入口在 `build/worker-entry.js`。本地新旧两版同一套 36 条用例逐条比对全一致、演示站真机直传实测通过后才发。
+- 方式一 / 方式三与普通部署包 `ym-nav-deploy-*.zip` 不受影响，照旧用。
+
 ### v2.1.2 · 2026-11-18
 
 - **点击计数写前重读合并**（对抗复读核验后修复）：/api/click 此前是整表读-改-写——读到写回之间别的请求刚落盘的计数会被整表覆盖吞掉。现写回前重读最新 clicks，若已被改动就把本请求的增量重新合并到最新值上再写（照 ym-dash 历史合并的口径）；限流与单次计数上限等规则不变。
