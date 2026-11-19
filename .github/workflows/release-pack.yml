@@ -32,8 +32,9 @@ jobs:
         run: |
           TAG="${REL_TAG:-$IN_TAG}"
           if [ -z "$TAG" ]; then echo "::error::没有拿到 Release 标签"; exit 1; fi
-          ZIPNAME="ym-nav-deploy-$(TZ=Asia/Shanghai date +%Y%m%d).zip"
-          WZIPNAME="ym-nav-worker-deploy-$(TZ=Asia/Shanghai date +%Y%m%d).zip"
+          if ! printf '%s' "$TAG" | grep -qE '^v[0-9]+\.[0-9]+\.[0-9]+$'; then echo "::error::标签格式不对：$TAG（应形如 v2.1.4）"; exit 1; fi
+          ZIPNAME="ym-nav-deploy-${TAG}-$(TZ=Asia/Shanghai date +%Y%m%d).zip"
+          WZIPNAME="ym-nav-worker-deploy-${TAG}-$(TZ=Asia/Shanghai date +%Y%m%d).zip"
           echo "tag=$TAG" >> "$GITHUB_OUTPUT"
           echo "zip=$ZIPNAME" >> "$GITHUB_OUTPUT"
           echo "wzip=$WZIPNAME" >> "$GITHUB_OUTPUT"
@@ -43,6 +44,15 @@ jobs:
         uses: actions/checkout@v4
         with:
           ref: ${{ steps.t.outputs.tag }}
+
+      - name: 准备 Node（跑测试与头表比对用）
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: 跑仓库测试（不过不打包）
+        run: |
+          for f in tests/*.mjs; do node "$f" || exit 1; done
 
       - name: 按清单打包
         env:
@@ -77,10 +87,39 @@ jobs:
           echo "包内文件："
           unzip -Z1 "$ZIPNAME"
           cat SHA256SUMS.txt
+          # 直传专用包：控制台拖拽上传不会编译 functions/，故把后端合成单个
+          # _worker.js（入口 build/worker-entry.js，原函数源码不改）另打一包。
+          # 包根 = _worker.js + 静态文件（原包清单里除 functions/ 外的那些）。
 
-      # 直传专用包：控制台拖拽上传不会编译 functions/，故把后端合成单个
-      # _worker.js（入口 build/worker-entry.js，原函数源码不改）另打一包。
-      # 包根 = _worker.js + 静态文件（原包清单里除 functions/ 外的那些）。
+      - name: 比对 _headers 与 worker-entry 头表（漂移即红灯）
+        run: |
+          cat > /tmp/cmp_headers.mjs <<'EOF'
+          import fs from 'node:fs';
+          const htxt = fs.readFileSync('_headers', 'utf8');
+          const fromFile = {};
+          for (const line of htxt.split('\n')) {
+            const t = line.trim();
+            if (!t || t.startsWith('/') || t.startsWith('#')) continue;
+            const i = t.indexOf(':');
+            if (i > 0) fromFile[t.slice(0, i).trim().toLowerCase()] = t.slice(i + 1).trim();
+          }
+          const src = fs.readFileSync('build/worker-entry.js', 'utf8');
+          const m = src.match(/const STATIC_HEADERS = \[([\s\S]*?)\];/);
+          if (!m) { console.error('STATIC_HEADERS not found'); process.exit(1); }
+          const fromCode = {};
+          for (const e of m[1].matchAll(/\[\s*'([^']+)'\s*,\s*(?:"([^"]*)"|'([^']*)')\s*\]/g)) {
+            fromCode[e[1].toLowerCase()] = (e[2] ?? e[3] ?? '').trim();
+          }
+          const keys = new Set([...Object.keys(fromFile), ...Object.keys(fromCode)]);
+          let bad = 0;
+          for (const k of keys) {
+            if (fromFile[k] !== fromCode[k]) { console.error(`MISMATCH ${k}: _headers=${JSON.stringify(fromFile[k])} code=${JSON.stringify(fromCode[k])}`); bad++; }
+          }
+          if (bad) { console.error(`headers drift: ${bad}`); process.exit(1); }
+          console.log(`headers in sync (${keys.size} entries)`);
+          EOF
+          node /tmp/cmp_headers.mjs
+
       - name: 打包直传专用包（_worker.js 高级模式）
         env:
           WZIPNAME: ${{ steps.t.outputs.wzip }}
@@ -115,8 +154,9 @@ jobs:
           WZIPNAME: ${{ steps.t.outputs.wzip }}
         run: |
           set -euo pipefail
-          gse view "$TAG" > /dev/null
+          gh release view "$TAG" > /dev/null
           gh release delete-asset "$TAG" "SHA256SUMS.txt" -y || true
-          gh release view "$TAG" --json assets --jq '.assets[].name' | grep -E '^ym-nav-worker-deploy-[0-9]{8}\.zip$' | grep -vx "$WZIPNAME" | while read -r a; do echo "删除旧直传包：$a"; gh release delete-asset "$TAG" "$a" -y; done || true
+          gh release view "$TAG" --json assets --jq '.assets[].name' | grep -E '^ym-nav-worker-deploy-.+\.zip$' | grep -vx "$WZIPNAME" | while read -r a; do echo "删除旧直传包：$a"; gh release delete-asset "$TAG" "$a" -y; done || true
+          gh release view "$TAG" --json assets --jq '.assets[].name' | grep -E '^ym-nav-deploy-.+\.zip$' | grep -vx "$ZIPNAME" | while read -r a; do echo "删除旧普通包：$a"; gh release delete-asset "$TAG" "$a" -y; done || true
           gh release upload "$TAG" "$ZIPNAME" "$WZIPNAME" SHA256SUMS.txt --clobber
           echo "已刷新到 Release $TAG：$ZIPNAME + $WZIPNAME + SHA256SUMS.txt"
