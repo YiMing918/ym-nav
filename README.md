@@ -4,10 +4,10 @@
 
 ![版本](https://img.shields.io/badge/版本-v2.1.3-blue) ![Cloudflare Pages](https://img.shields.io/badge/Cloudflare-Pages-F38020?logo=cloudflare&logoColor=white) ![Workers KV](https://img.shields.io/badge/Storage-Workers_KV-F38020) ![Pages Functions](https://img.shields.io/badge/Backend-Pages_Functions-orange) ![JavaScript](https://img.shields.io/badge/JavaScript-单文件前端-F7DF1E?logo=javascript&logoColor=black) ![Free](https://img.shields.io/badge/费用-免费额度-3fb950)
 
-**[下载最新版](https://github.com/YiMing918/ym-nav/releases/latest) · [博客教程](https://bk.ymaym.top/post/ym-nav-guide)**
+**[下载最新版](https://github.com/YiMing918/ym-nav/releases/latest) · [博客教程](https://bk.ymaym.top/post/ym-nav-guide) · [在线演示](https://nav.yma.gn0.cc)**
 
-> 本项目为个人自用而作，**不提供在线体验**：演示站必然要放真实收藏，收藏是私人的。
-> 想看效果请看下方「效果预览」（示例数据渲染），或按本文的部署章节一步步搭一个自己的——全文按完全没用过 Cloudflare / GitHub 的新手写的，每一步都拆到点哪个按钮、填什么。
+> 本项目为个人自用而作：作者自己在用的站放的是真实收藏，不公开；另备了一个只放示例数据的 **[演示站](https://nav.yma.gn0.cc)**，可以随便点着看效果。
+> 也可以看下方「效果预览」的截图，或按本文的部署章节一步步搭一个自己的——全文按完全没用过 Cloudflare / GitHub 的新手写的，每一步都拆到点哪个按钮、填什么。
 
 ## 目录
 
@@ -129,6 +129,9 @@
 - 键盘快捷键：`/` 聚焦搜索框，`Esc` 清空搜索
 - KV 暂时读不到时自动用浏览器本地缓存顶上，不白屏；本地缓存只存公开视角（写入前先剔除私密分类与私密链接，从不落本机），退出登录时缓存一并清掉，共享设备上访客走缓存也拿不到私密数据
 
+![添加网站表单](docs/demo-addlink.png)
+*添加网站的表单（演示站真实截图）：所属分类、名称、英文名、网址、描述、可达性徽标、图标、私密开关都在这一张表单里。*
+
 ---
 
 ## 🖼️ 效果预览
@@ -142,6 +145,18 @@
 | 移动端 | 点分类只看该类 | 长按卡片看描述 |
 | --- | --- | --- |
 | ![移动端](https://gcore.jsdelivr.net/gh/YiMing918/ym-nav@main/docs/preview-mobile.png) | ![单分类视图](https://gcore.jsdelivr.net/gh/YiMing918/ym-nav@main/docs/preview-single.png) | ![长按描述](https://gcore.jsdelivr.net/gh/YiMing918/ym-nav@main/docs/preview-desc.png) |
+
+### 真实截图（演示站）
+
+上面是渲染图，下面是演示站的真实界面截图（站里放的全是示例数据）。演示站地址：[https://nav.yma.gn0.cc](https://nav.yma.gn0.cc)，可以随便点着体验。
+
+| 桌面首页（带「常去」区） | 登录后的首页（底部是管理栏） |
+| --- | --- |
+| ![演示站桌面首页](docs/demo-home.png) | ![演示站登录后](docs/demo-admin.png) |
+
+| 手机上打开 | 长按卡片看描述 |
+| --- | --- |
+| ![演示站手机版](docs/demo-mobile.png) | ![演示站长按描述](docs/demo-desc.png) |
 
 ---
 
@@ -276,6 +291,9 @@
 5. 点 **保存（Save）**。
 
 做到这里你应该看到：绑定列表里多了一行，类型是 KV 命名空间、变量名正好是 `NAV_KV`。
+
+![KV 绑定](docs/cf-kv-bind.png)
+*绑好的样子（真实截图）：绑定表里一行 KV 命名空间，名称（变量名）是 `NAV_KV`，值是刚建的那个命名空间。*
 
 **第三步：重新部署一次让绑定生效**
 
@@ -572,6 +590,9 @@
 
 做到这里你应该看到：页面显示部署成功，并给出 `https://你的项目名.pages.dev` 链接，点开是一个空的导航首页。
 
+![上传部署页](docs/cf-upload.png)
+*上传页长这样（真实截图）：把 zip 拖到中间的虚线框里，或点框选文件，选好后点右下角「保存并部署」。*
+
 **第 3 步：建 KV 并绑定**
 
 照「通用操作 A」做完三步：建命名空间 → 在项目 **设置 → 绑定** 里加 KV 绑定、变量名必须 `NAV_KV` → **重新部署一次**（直传方式就在 **部署** 页对最新一条点 `…` → **重试部署**）。注意：直传方式第一次上传时尚不存在绑定，所以这步「改完绑定重新部署」不能省。
@@ -745,6 +766,9 @@ Node.js 没装好或终端没重开：装完 Node 后把终端关掉重开，再
 ### 第二层：收藏测活（探你收藏的网站们还活着吗）
 
 这是本站自带功能，不用额外装东西：登录后台 → **工具 → 链接测活**，点开始，服务端会挨个探测你收藏的全部网站，结果分三类列出：正常 / 疑似失效（404、410，可在结果里当场删掉）/ 无法判定（超时、被对方拦截等，不等于死了）。建议隔段时间跑一遍清死链。注意它一次会写少量 KV（限流计数等），别当闹钟天天连点。
+
+![链接测活结果](docs/demo-probe.png)
+*测活跑完的样子（演示站真实截图）：结果按正常 / 疑似失效 / 无法判定三类汇总，疑似失效的可以直接在结果里删掉。*
 
 ---
 
@@ -974,8 +998,8 @@ KV 内部 key 一览：
 **原仓库更新了代码，我 Fork 部署的站会自动更新吗？**
 不会自动跨仓库流动。Cloudflare 只自动部署它连接着的那个仓库：Fork 用户先在自己的 Fork 点一次 **Sync fork**（或按「升级版本」一节开启全自动同步），同步完成、你的仓库有了新提交，Cloudflare 才会自动部署。如果是仓库作者本人部署（连的就是自己的仓库），推送即自动部署，没有这一步。
 
-**为什么没有在线演示？**
-导航站的价值就是里面收藏的网址，那些是个人数据，不适合公开。效果看「效果预览」的截图就够了，部署一个自己的只要几分钟。
+**有没有在线演示？**
+有：[https://nav.yma.gn0.cc](https://nav.yma.gn0.cc) 是只放示例数据的演示站，可以随便点。作者自己在用的站里是真实收藏，那些是个人数据，不公开。想自己搭一个，按部署章节来，只要几分钟。
 
 ---
 ## 出事了怎么办（丢了 / 坏了 / 删了）
