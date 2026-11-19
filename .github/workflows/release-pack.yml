@@ -115,8 +115,8 @@ jobs:
           WZIPNAME: ${{ steps.t.outputs.wzip }}
         run: |
           set -euo pipefail
-          gh release view "$TAG" > /dev/null
-          gh release delete-asset "$TAG" "ym-nav-SHA256SUMS.txt" -y || true
+          gse view "$TAG" > /dev/null
+          gh release delete-asset "$TAG" "SHA256SUMS.txt" -y || true
           gh release view "$TAG" --json assets --jq '.assets[].name' | grep -E '^ym-nav-worker-deploy-[0-9]{8}\.zip$' | grep -vx "$WZIPNAME" | while read -r a; do echo "删除旧直传包：$a"; gh release delete-asset "$TAG" "$a" -y; done || true
           gh release upload "$TAG" "$ZIPNAME" "$WZIPNAME" SHA256SUMS.txt --clobber
           echo "已刷新到 Release $TAG：$ZIPNAME + $WZIPNAME + SHA256SUMS.txt"
