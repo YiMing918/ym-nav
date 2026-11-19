@@ -423,7 +423,7 @@ const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({'&':'&amp;','<':
 // only hex colors / fa-* classes may reach style/class attributes.
 const safeHref = (u) => { const s = String(u ?? ''); if (/[\u0000-\u0020\u007f]/.test(s)) return '#'; try { const p = new URL(s); return (p.protocol === 'http:' || p.protocol === 'https:') ? s : '#'; } catch { return '#'; } };
 const safeColor = (c, dflt = '#6366f1') => (/^#[0-9a-fA-F]{3}([0-9a-fA-F]{3})?([0-9a-fA-F]{2})?$/.test(String(c || '')) ? String(c) : dflt);
-const safeIcon = (c, dflt = 'fa-solid fa-folder') => (/^fa-[a-z0-9-]+( fa-[a-z0-9-]+)*$/.test(String(c || '')) ? String(c) : dflt);
+const safeIcon = (c, dflt = 'fa-solid fa-folder') => (/^(fa|fas|far|fab|fal|fat|fa-solid|fa-regular|fa-brands|fa-light|fa-thin|fa-duotone)( fa-[a-z0-9-]+)+$/.test(String(c || '')) ? String(c) : dflt);
 const S = {
   cfg: null, clicks: {}, authed: false, needsSetup: false,
   lang: localStorage.getItem('ymnav_lang') || 'zh',

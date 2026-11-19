@@ -4,7 +4,7 @@ import { json, getAdmin, isAuthed, kvMissing, sameOriginOk } from '../_auth.js';
 const DEFAULT_CONFIG = { version: 1, settings: { siteName: '我的导航', siteNameEn: 'My Nav', wallpaper: '', theme: 'auto', colsDesktop: 5, colsMobile: 3, showFrequent: true, openInNewTab: true }, sections: [] };
 const MAX_BODY_BYTES = 5 * 1024 * 1024;
 const HEX_COLOR = /^#[0-9a-fA-F]{3}([0-9a-fA-F]{3})?([0-9a-fA-F]{2})?$/;
-const ICON_CLASS = /^fa-[a-z0-9-]+( fa-[a-z0-9-]+)*$/;
+const ICON_CLASS = /^(fa|fas|far|fab|fal|fat|fa-solid|fa-regular|fa-brands|fa-light|fa-thin|fa-duotone)( fa-[a-z0-9-]+)+$/;
 export function isSafeLinkUrl(raw) {
   if (typeof raw !== 'string') return false;
   if (/[\u0000-\u0020\u007f]/.test(raw)) return false;
