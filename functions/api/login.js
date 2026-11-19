@@ -1,5 +1,5 @@
 // POST /api/login { username, password } -> sets HttpOnly session cookie
-import { json, getAdmin, verifyPassword, hashPassword, isLegacyHash, createSession, sessionCookie } from '../_auth.js';
+import { json, getAdmin, kvMissing, sameOriginOk, verifyPassword, hashPassword, isLegacyHash, createSession, sessionCookie } from '../_auth.js';
 
 // 登录失败限流：同来源 IP 15 分钟内失败 >=5 次锁定 15 分钟。
 // 计数只存内存（按 isolate），不写 KV：旧版每次失败都往 KV 写一次，
@@ -23,6 +23,8 @@ function rlRecordFail(ip) {
 }
 
 export async function onRequestPost({ request, env }) {
+  if (kvMissing(env)) return json({ error: 'KV binding NAV_KV missing' }, 500);
+  if (!sameOriginOk(request)) return json({ error: 'cross-origin request rejected' }, 403);
   const admin = await getAdmin(env);
   if (!admin) return json({ error: 'not_setup' }, 400);
   const ip = request.headers.get('cf-connecting-ip') || 'unknown';
@@ -37,6 +39,7 @@ export async function onRequestPost({ request, env }) {
     rlRecordFail(ip);
     return json({ error: 'wrong credentials' }, 403);
   };
+  if (password.length > 128) return fail();
   // 【C-29 修复】用户名与口令分开验：用户名不对时也照样跑一遍口令
   // 哈希再判失败，避免「用户名错 → 立刻返回、用户名对 → 慢」的耗时
   // 差把真实用户名漏出去（旧版第一行命中就短路、不跑哈希）。

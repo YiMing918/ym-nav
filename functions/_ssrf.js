@@ -206,6 +206,7 @@ export async function safeFetch(input, init = {}, opts = {}) {
   const maxRedirects = opts.maxRedirects ?? MAX_REDIRECTS;
   const timeoutMs = opts.timeoutMs || 0;
   let url = assertSafeUrl(input);
+  if (typeof opts.extraValidate === 'function') opts.extraValidate(url);
   let method = String(init.method || 'GET').toUpperCase();
   let body = init.body;
   let timer = null;
@@ -229,6 +230,7 @@ export async function safeFetch(input, init = {}, opts = {}) {
         throw new SsrfError('blocked', 'unparseable redirect location');
       }
       assertSafeUrl(next); // re-validate EVERY hop before following it
+      if (typeof opts.extraValidate === 'function') opts.extraValidate(next);
       try { if (res.body) await res.body.cancel(); } catch { /* ignore */ }
       if (res.status === 303 && method !== 'GET' && method !== 'HEAD') {
         method = 'GET';
@@ -249,6 +251,10 @@ export async function safeFetch(input, init = {}, opts = {}) {
 // with nothing bounding time or memory. This reader cancels the stream
 // as soon as either budget is blown. Returns an ArrayBuffer.
 export async function readBodyLimited(res, { maxBytes = 1024 * 1024, timeoutMs = 10000 } = {}) {
+  try {
+    const cl = res && res.headers && typeof res.headers.get === 'function' ? Number(res.headers.get('Content-Length')) : NaN;
+    if (Number.isFinite(cl) && cl > maxBytes) throw new Error('body too large');
+  } catch (e) { if (e && e.message === 'body too large') throw e; }
   if (!res || !res.body || typeof res.body.getReader !== 'function') {
     const buf = await res.arrayBuffer();
     if (buf.byteLength > maxBytes) throw new Error('body too large');

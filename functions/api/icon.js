@@ -38,8 +38,31 @@ function imgResp(buf, type) {
   });
 }
 
-async function fetchIconBytes(url) {
-  const r = await safeFetch(url, { headers: { 'User-Agent': UA } }, { timeoutMs: 5000 });
+// H4: icon fetching is restricted to hosts present in the site config
+// and to ports 80/443 only (explicit non-standard ports are rejected;
+// an empty port means the scheme default). This check runs before the
+// initial fetch and on every redirect hop / candidate via extraValidate.
+function iconUrlAllowed(u, allowedHosts) {
+  const url = u instanceof URL ? u : new URL(String(u));
+  if (url.port && url.port !== '80' && url.port !== '443') throw new Error('icon port not allowed');
+  if (allowedHosts && !allowedHosts.has(url.hostname.toLowerCase())) throw new Error('icon host not in config');
+  return url;
+}
+async function loadConfigHosts(env) {
+  if (!env || !env.NAV_KV) return null;
+  try {
+    const rawCfg = await env.NAV_KV.get('site_config');
+    if (!rawCfg) return new Set();
+    const cfg = JSON.parse(rawCfg);
+    const hosts = new Set();
+    for (const s of (Array.isArray(cfg.sections) ? cfg.sections : [])) for (const l of (s && Array.isArray(s.links) ? s.links : [])) {
+      try { hosts.add(new URL(l.url).hostname.toLowerCase()); } catch { }
+    }
+    return hosts;
+  } catch { return new Set(); }
+}
+async function fetchIconBytes(url, allowedHosts) {
+  const r = await safeFetch(url, { headers: { 'User-Agent': UA } }, { timeoutMs: 5000, extraValidate: (u) => iconUrlAllowed(u, allowedHosts) });
   if (!r.ok) return null;
   const type = (r.headers.get('Content-Type') || '').split(';')[0].trim().toLowerCase();
   // SVG is an XML document that can carry script — never proxy it from
@@ -61,10 +84,10 @@ async function fetchIconBytes(url) {
   return { buf, type: type || 'image/x-icon' };
 }
 
-async function resolveIcon(u) {
+async function resolveIcon(u, allowedHosts) {
   const candidates = [];
   try {
-    const r = await safeFetch(u.toString(), { headers: { 'User-Agent': UA, 'Accept': 'text/html' } }, { timeoutMs: 6000 });
+    const r = await safeFetch(u.toString(), { headers: { 'User-Agent': UA, 'Accept': 'text/html' } }, { timeoutMs: 6000, extraValidate: (x) => iconUrlAllowed(x, allowedHosts) });
     if (r.ok) {
       // Resolve relative icon hrefs against the final URL after any
       // (validated) redirects, not the originally requested one.
@@ -89,14 +112,14 @@ async function resolveIcon(u) {
       }
       links.sort((a, b) => b.score - a.score);
       for (const l of links) {
-        try { candidates.push(assertSafeUrl(new URL(l.href, base)).toString()); } catch { /* unsafe candidate: skip */ }
+        try { candidates.push(iconUrlAllowed(assertSafeUrl(new URL(l.href, base)), allowedHosts).toString()); } catch { /* unsafe / non-config candidate: skip */ }
       }
     }
   } catch { /* blocked hop / timeout / network error: fall through to defaults */ }
   candidates.push(u.origin + '/apple-touch-icon.png', u.origin + '/favicon.ico');
   for (const c of [...new Set(candidates)]) {
     try {
-      const got = await fetchIconBytes(c);
+      const got = await fetchIconBytes(c, allowedHosts);
       if (got) return got;
     } catch { /* unsafe or failed candidate (incl. a blocked redirect hop): try next */ }
   }
@@ -117,6 +140,13 @@ export async function onRequestGet({ request, env }) {
     return json({ error: isBadSyntax(q) ? 'bad url' : 'blocked' }, 400);
   }
   const host = u.hostname.toLowerCase();
+  // H4 port gate applies even when KV/config is unavailable.
+  if (u.port && u.port !== '80' && u.port !== '443') return json({ error: 'blocked' }, 400);
+  const allowedHosts = await loadConfigHosts(env);
+  // When a config exists, only its hosts may be fetched at all (not just
+  // cached). With no KV binding there is no config to check against, so
+  // the port + SSRF gates alone apply (degraded local/test mode).
+  if (allowedHosts && !allowedHosts.has(host)) return json({ error: 'no icon' }, 404);
   const key = 'icon:' + host;
   if (env.NAV_KV) {
     try {
@@ -134,21 +164,8 @@ export async function onRequestGet({ request, env }) {
   // 只给「配置里真实存在的链接主机」落缓存：缓存键按主机名，陌生
   // 主机（比如泛解析批量造的子域名）以前也能各写一份图标进来，
   // 持续消耗全账号写额度。陌生主机照常实时解析返回、只是不落 KV。
-  let cacheable = false;
-  if (env.NAV_KV) {
-    try {
-      const rawCfg = await env.NAV_KV.get('site_config');
-      if (rawCfg) {
-        const cfg = JSON.parse(rawCfg);
-        const hosts = new Set();
-        for (const s of cfg.sections || []) for (const l of s.links || []) {
-          try { hosts.add(new URL(l.url).hostname.toLowerCase()); } catch { /* skip bad url */ }
-        }
-        cacheable = hosts.has(host);
-      }
-    } catch { /* config unreadable: resolve live without caching */ }
-  }
-  const icon = await resolveIcon(u);
+  const cacheable = !!(allowedHosts && allowedHosts.has(host));
+  const icon = await resolveIcon(u, allowedHosts);
   if (!icon) {
     if (env.NAV_KV && cacheable) { try { await env.NAV_KV.put(key + ':miss', '1', { expirationTtl: 30 * 24 * 3600 }); } catch { /* ignore */ } }
     return json({ error: 'no icon' }, 404);

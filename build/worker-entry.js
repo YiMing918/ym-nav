@@ -50,7 +50,9 @@ const STATIC_HEADERS = [
   ['X-Frame-Options', 'DENY'],
   ['X-Content-Type-Options', 'nosniff'],
   ['Referrer-Policy', 'no-referrer'],
-  ['Content-Security-Policy', "frame-ancestors 'none'"],
+  ['Strict-Transport-Security', 'max-age=31536000; includeSubDomains'],
+  ['Permissions-Policy', 'camera=(), microphone=(), payment=(), geolocation=(self)'],
+  ['Content-Security-Policy', "default-src 'self'; script-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com; style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com; img-src 'self' data: blob: https:; font-src 'self' data: https://cdnjs.cloudflare.com; connect-src 'self' https:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'"],
 ];
 
 async function serveAsset(request, env, url) {
@@ -78,6 +80,14 @@ export default {
     if (path.length > 1 && path.endsWith('/')) path = path.slice(0, -1);
     const route = ROUTES[path];
     const handler = route && route[request.method];
+    if (handler && (request.method === 'POST' || request.method === 'DELETE')) {
+      const origin = request.headers.get('Origin');
+      if (origin) {
+        let okOrigin = false;
+        try { okOrigin = new URL(origin).host === url.host; } catch { okOrigin = false; }
+        if (!okOrigin) return new Response(JSON.stringify({ error: 'cross-origin request rejected' }), { status: 403, headers: { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' } });
+      }
+    }
     if (handler) {
       return handler({
         request,

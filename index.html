@@ -419,6 +419,11 @@
 const $ = (s, el) => (el || document).querySelector(s);
 const $$ = (s, el) => [...(el || document).querySelectorAll(s)];
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+// Audit #10 / mid9 frontend backstops: only http(s) URLs may reach href,
+// only hex colors / fa-* classes may reach style/class attributes.
+const safeHref = (u) => { const s = String(u ?? ''); if (/[\u0000-\u0020\u007f]/.test(s)) return '#'; try { const p = new URL(s); return (p.protocol === 'http:' || p.protocol === 'https:') ? s : '#'; } catch { return '#'; } };
+const safeColor = (c, dflt = '#6366f1') => (/^#[0-9a-fA-F]{3}([0-9a-fA-F]{3})?([0-9a-fA-F]{2})?$/.test(String(c || '')) ? String(c) : dflt);
+const safeIcon = (c, dflt = 'fa-solid fa-folder') => (/^fa-[a-z0-9-]+( fa-[a-z0-9-]+)*$/.test(String(c || '')) ? String(c) : dflt);
 const S = {
   cfg: null, clicks: {}, authed: false, needsSetup: false,
   lang: localStorage.getItem('ymnav_lang') || 'zh',
@@ -450,8 +455,8 @@ function hostOf(u) { try { return new URL(u).hostname.replace(/^www\./, ''); } c
 // S.cfg，登录当次显示不受影响）。这样共享设备上访客走缓存兜底时也拿不到私密数据，与服务端剔除同口径。
 function publicView(cfg) {
   const c = JSON.parse(JSON.stringify(cfg || {}));
-  c.sections = (c.sections || []).filter((s) => !s.private)
-    .map((s) => ({ ...s, links: (s.links || []).filter((l) => !l.private) }));
+  c.sections = (Array.isArray(c.sections) ? c.sections : []).filter((s) => s && typeof s === 'object' && !s.private)
+    .map((s) => ({ ...s, links: (Array.isArray(s.links) ? s.links : []).filter((l) => l && typeof l === 'object' && !l.private) }));
   return c;
 }
 // Adopt a config that just arrived from the server: it becomes the
@@ -477,7 +482,7 @@ async function load() {
     // refuse, so the subset can never overwrite the full server config.
     S.dataOk = false;
     const cache = localStorage.getItem('ymnav_cache');
-    if (cache) { S.cfg = JSON.parse(cache); toast(T('网络异常，显示上次缓存', 'Offline, showing cache')); }
+    if (cache) { try { S.cfg = JSON.parse(cache); toast(T('网络异常，显示上次缓存', 'Offline, showing cache')); } catch { S.cfg = { version: 1, settings: {}, sections: [] }; } }
     else { S.cfg = { version: 1, settings: {}, sections: [] }; }
   }
   if (!S.cfg.settings) S.cfg.settings = {};
@@ -603,10 +608,10 @@ function badgeHtml(l) {
   return '';
 }
 function iconHtml(l, sec) {
-  const color = l.color || sec.accent || '#6366f1';
-  if (l.icon) return `<div class="ic" style="color:${esc(color)}"><i class="${esc(l.icon)}"></i></div>`;
+  const color = safeColor(l.color || sec.accent || '#6366f1');
+  if (l.icon) return `<div class="ic" style="color:${esc(color)}"><i class="${esc(safeIcon(l.icon, 'fa-solid fa-link'))}"></i></div>`;
   const letter = esc((l.name || '?').trim().charAt(0) || '?');
-  return `<div class="ic" style="color:${esc(color)}"><img data-fav src="/api/icon?u=${encodeURIComponent(l.url)}" alt="" loading="lazy"><span class="letter" style="display:none">${letter}</span></div>`;
+  return `<div class="ic" style="color:${esc(color)}"><img data-fav src="/api/icon?u=${encodeURIComponent(safeHref(l.url) === '#' ? '' : l.url)}" alt="" loading="lazy"><span class="letter" style="display:none">${letter}</span></div>`;
 }
 document.addEventListener('error', (e) => {
   const img = e.target;
@@ -628,28 +633,28 @@ function tileHtml(l, sec) {
   const acts = S.edit ? `<span class="acts"><button data-move="-1" title="前移">←</button><button data-move="1" title="后移">→</button></span>` : '';
   const lock = l.private ? ' <i class="fa-solid fa-lock" style="color:var(--muted);font-size:11px"></i>' : '';
   if (secStyle(sec) === 'text') {
-    return `<a class="tile textonly" href="${esc(l.url)}"${target} data-id="${esc(l.id)}" data-sec="${esc(sec.id)}">${badgeHtml(l)}<div class="tx"><div class="nm">${esc(linkName(l))}${lock}</div></div>${acts}</a>`;
+    return `<a class="tile textonly" href="${esc(safeHref(l.url))}"${target} data-id="${esc(l.id)}" data-sec="${esc(sec.id)}">${badgeHtml(l)}<div class="tx"><div class="nm">${esc(linkName(l))}${lock}</div></div>${acts}</a>`;
   }
   if (secStyle(sec) === 'wide') {
-    return `<a class="tile" href="${esc(l.url)}"${target} data-id="${esc(l.id)}" data-sec="${esc(sec.id)}">${badgeHtml(l)}${iconHtml(l, sec)}<div class="tx"><div class="nm">${esc(linkName(l))}${lock}</div><div class="sb">${esc(sub)}</div></div>${acts}</a>`;
+    return `<a class="tile" href="${esc(safeHref(l.url))}"${target} data-id="${esc(l.id)}" data-sec="${esc(sec.id)}">${badgeHtml(l)}${iconHtml(l, sec)}<div class="tx"><div class="nm">${esc(linkName(l))}${lock}</div><div class="sb">${esc(sub)}</div></div>${acts}</a>`;
   }
-  return `<a class="tile v" href="${esc(l.url)}"${target} data-id="${esc(l.id)}" data-sec="${esc(sec.id)}">${badgeHtml(l)}${iconHtml(l, sec)}<div class="tx"><div class="nm">${esc(linkName(l))}${lock}</div><div class="dm">${esc(hostOf(l.url))}</div></div>${acts}</a>`;
+  return `<a class="tile v" href="${esc(safeHref(l.url))}"${target} data-id="${esc(l.id)}" data-sec="${esc(sec.id)}">${badgeHtml(l)}${iconHtml(l, sec)}<div class="tx"><div class="nm">${esc(linkName(l))}${lock}</div><div class="dm">${esc(hostOf(l.url))}</div></div>${acts}</a>`;
 }
 function matches(l) {
   if (!S.query) return true;
   const q = S.query.toLowerCase();
   return (l.name || '').toLowerCase().includes(q) || (l.nameEn || '').toLowerCase().includes(q) || (l.url || '').toLowerCase().includes(q);
 }
-function allLinks() { return (S.cfg.sections || []).flatMap((s) => (s.links || []).map((l) => [l, s])); }
+function allLinks() { return (Array.isArray(S.cfg.sections) ? S.cfg.sections : []).filter((s) => s && typeof s === 'object').flatMap((s) => (Array.isArray(s.links) ? s.links : []).filter((l) => l && typeof l === 'object').map((l) => [l, s])); }
 
 function render() {
   applySettings();
-  const secs = S.cfg.sections || [];
+  const secs = (Array.isArray(S.cfg.sections) ? S.cfg.sections : []).filter((s) => s && typeof s === 'object');
   const st = S.cfg.settings || {};
   // category menu (top-left 分类 button dropdown)
   $('#catBtnTx').textContent = T('分类', 'Categories');
   let menu = `<button class="cmitem" data-jump="top"><span class="dot" style="background:#6366f1"><i class="fa-solid fa-border-all"></i></span>${T('全部', 'All')}<span class="cnt">${secs.reduce((a, s) => a + (s.links || []).length, 0)}</span></button>`;
-  for (const s of secs) menu += `<button class="cmitem" data-jump="${esc(s.id)}"><span class="dot" style="background:${esc(s.accent || '#6366f1')}"><i class="${esc(s.icon || 'fa-solid fa-folder')}"></i></span>${esc(secName(s))}${s.private ? ' <i class="fa-solid fa-lock" style="color:var(--muted);font-size:11px"></i>' : ''}<span class="cnt">${(s.links || []).length}</span></button>`;
+  for (const s of secs) menu += `<button class="cmitem" data-jump="${esc(s.id)}"><span class="dot" style="background:${esc(safeColor(s.accent))}"><i class="${esc(safeIcon(s.icon))}"></i></span>${esc(secName(s))}${s.private ? ' <i class="fa-solid fa-lock" style="color:var(--muted);font-size:11px"></i>' : ''}<span class="cnt">${(s.links || []).length}</span></button>`;
   $('#catMenu').innerHTML = menu;
   // frequent
   let html = '';
@@ -667,7 +672,7 @@ function render() {
     const links = (s.links || []).filter(matches);
     if (S.query && !links.length) continue;
     total += links.length;
-    html += `<section class="blk" id="sec-${esc(s.id)}"><div class="blkhead"><span class="dot" style="background:${esc(s.accent || '#6366f1')}"><i class="${esc(s.icon || 'fa-solid fa-folder')}"></i></span><h2>${esc(secName(s))}</h2>${s.private ? '<i class="fa-solid fa-lock" style="color:var(--muted);font-size:12px"></i>' : ''}<span class="cnt">${links.length}</span><span class="sp"></span>${S.edit ? `<button class="mini" data-addto="${esc(s.id)}">＋ ${T('加网站', 'Add')}</button>` : ''}</div><div class="grid ${secStyle(s) === 'wide' ? 'wide' : secStyle(s) === 'vt' ? 'vt' : ''}">${links.map((l) => tileHtml(l, s)).join('')}</div></section>`;
+    html += `<section class="blk" id="sec-${esc(s.id)}"><div class="blkhead"><span class="dot" style="background:${esc(safeColor(s.accent))}"><i class="${esc(safeIcon(s.icon))}"></i></span><h2>${esc(secName(s))}</h2>${s.private ? '<i class="fa-solid fa-lock" style="color:var(--muted);font-size:12px"></i>' : ''}<span class="cnt">${links.length}</span><span class="sp"></span>${S.edit ? `<button class="mini" data-addto="${esc(s.id)}">＋ ${T('加网站', 'Add')}</button>` : ''}</div><div class="grid ${secStyle(s) === 'wide' ? 'wide' : secStyle(s) === 'vt' ? 'vt' : ''}">${links.map((l) => tileHtml(l, s)).join('')}</div></section>`;
   }
   if (!secs.length) html = `<div class="empty">${T('还没有任何收藏。双击上方站名登录后，在「数据」里导入备份，或逐个添加。', 'No bookmarks yet. Double-click the site name to log in, then import or add.')}</div>`;
   else if (S.query && !total) html = `<div class="empty">${T('站内没有找到，试试用上面的搜索引擎搜全网。', 'Not found locally. Try a web engine above.')}</div>`;
@@ -977,7 +982,7 @@ $('#abAdd').addEventListener('click', () => openLinkEditor(null, null));
 /* ---------------- sections ---------------- */
 let secCtx = { id: null };
 function openSections() {
-  $('#secList').innerHTML = S.cfg.sections.map((s, i) => `<div class="listrow"><span class="dot" style="width:24px;height:24px;border-radius:7px;display:inline-flex;align-items:center;justify-content:center;color:#fff;font-size:12px;background:${esc(s.accent || '#6366f1')}"><i class="${esc(s.icon || 'fa-solid fa-folder')}"></i></span><span class="grow">${esc(s.title)}${s.private ? ' 🔒' : ''} <span class="freq-tag">${s.links.length}</span></span><button data-sact="up" data-i="${i}">↑</button><button data-sact="down" data-i="${i}">↓</button><button data-sact="edit" data-i="${i}">✎</button></div>`).join('') || `<p class="hint">${T('还没有分类', 'No categories')}</p>`;
+  $('#secList').innerHTML = S.cfg.sections.map((s, i) => `<div class="listrow"><span class="dot" style="width:24px;height:24px;border-radius:7px;display:inline-flex;align-items:center;justify-content:center;color:#fff;font-size:12px;background:${esc(safeColor(s.accent))}"><i class="${esc(safeIcon(s.icon))}"></i></span><span class="grow">${esc(s.title)}${s.private ? ' 🔒' : ''} <span class="freq-tag">${s.links.length}</span></span><button data-sact="up" data-i="${i}">↑</button><button data-sact="down" data-i="${i}">↓</button><button data-sact="edit" data-i="${i}">✎</button></div>`).join('') || `<p class="hint">${T('还没有分类', 'No categories')}</p>`;
   open('#mSections');
 }
 $('#secList').addEventListener('click', async (e) => {
@@ -1169,7 +1174,7 @@ $('#expHtml').addEventListener('click', () => {
   let h = '<!DOCTYPE NETSCAPE-Bookmark-file-1>\n<META HTTP-EQUIV="Content-Type" CONTENT="text/html; charset=UTF-8">\n<TITLE>Bookmarks</TITLE>\n<H1>Bookmarks</H1>\n<DL><p>\n';
   for (const s of S.cfg.sections) {
     h += `<DT><H3>${esc(s.title)}</H3>\n<DL><p>\n`;
-    for (const l of s.links) h += `<DT><A HREF="${esc(l.url)}">${esc(l.name)}</A>\n`;
+    for (const l of s.links) h += `<DT><A HREF="${esc(safeHref(l.url))}">${esc(l.name)}</A>\n`;
     h += '</DL><p>\n';
   }
   h += '</DL><p>\n';

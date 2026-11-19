@@ -15,7 +15,7 @@
 // gate as login/icon is applied per IP: "rl:probe:<ip>", 15-min
 // window, 15-min lock, 30 calls per window (30 x 25 = 750 URLs — far
 // above any hand-run liveness sweep, far below an abuse loop).
-import { json, isAuthed } from '../_auth.js';
+import { json, isAuthed, sameOriginOk } from '../_auth.js';
 import { assertSafeUrl, safeFetch, rateLimited } from '../_ssrf.js';
 
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36';
@@ -51,6 +51,7 @@ async function probeOne(item) {
 
 export async function onRequestPost({ request, env }) {
   if (!env.NAV_KV) return json({ error: 'KV binding NAV_KV missing' }, 500);
+  if (!sameOriginOk(request)) return json({ error: 'cross-origin request rejected' }, 403);
   if (!(await isAuthed(request, env))) return json({ error: 'unauthorized' }, 401);
   if (await rateLimited(env, request, { scope: 'probe', limit: 30 })) {
     return json({ error: 'too many attempts, try again in 15 minutes' }, 429);

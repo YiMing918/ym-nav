@@ -4,7 +4,7 @@
 // burst of clicks costs ONE KV write instead of one write per click.
 // Both shapes only count ids that exist in the config (an arbitrary id
 // must not be able to grow the clicks map or pollute the "frequent" area).
-import { json } from '../_auth.js';
+import { json, kvMissing, sameOriginOk } from '../_auth.js';
 import { rateLimited } from '../_ssrf.js';
 
 const MAX_ITEMS = 100;  // distinct links per flush
@@ -14,6 +14,8 @@ const MAX_PER_ITEM = 5; // clicks per link per flush (was 100: an anonymous
                         // more than a couple of clicks per link)
 
 export async function onRequestPost({ request, env }) {
+  if (kvMissing(env)) return json({ error: 'KV binding NAV_KV missing' }, 500);
+  if (!sameOriginOk(request)) return json({ error: 'cross-origin request rejected' }, 403);
   // 本端点匿名可调且每个有效请求固定写 1 次 KV——此前零限流，循环
   // POST 1000 次就能烧完全账号当天的 KV 写额度（2026-11-12 事故的
   // 同款形状），顺带刷爆任意链接的计数。复用现成内存限流：正常
@@ -46,14 +48,15 @@ export async function onRequestPost({ request, env }) {
     try {
       const cfg = JSON.parse(rawCfg);
       validIds = new Set();
-      for (const s of cfg.sections || []) for (const l of s.links || []) validIds.add(l.id);
+      for (const s of (Array.isArray(cfg.sections) ? cfg.sections : [])) for (const l of (s && Array.isArray(s.links) ? s.links : [])) if (l && l.id) validIds.add(l.id);
     } catch { /* 配置损坏时拒绝计数，比污染数据稳妥 */ }
   }
   if (!validIds) return json({ error: 'unknown id' }, 400);
   let clicks = {};
   const raw = await env.NAV_KV.get('clicks');
   if (raw) {
-    try { clicks = JSON.parse(raw); } catch { /* ignore */ }
+    try { const c = JSON.parse(raw); if (!c || typeof c !== 'object' || Array.isArray(c)) throw new Error('bad'); clicks = c; }
+    catch { return json({ error: 'clicks data corrupted; refusing to overwrite' }, 500); }
   }
   let applied = 0;
   for (const [id, n] of Object.entries(delta)) {
@@ -69,7 +72,7 @@ export async function onRequestPost({ request, env }) {
   const rawLatest = await env.NAV_KV.get('clicks');
   if (rawLatest !== raw) {
     let latest = null;
-    if (rawLatest) { try { latest = JSON.parse(rawLatest); } catch { latest = null; } }
+    if (rawLatest) { try { latest = JSON.parse(rawLatest); } catch { return json({ error: 'clicks data corrupted; refusing to overwrite' }, 500); } }
     if (latest && typeof latest === 'object') {
       for (const [id, n] of Object.entries(delta)) {
         if (!validIds.has(id)) continue;

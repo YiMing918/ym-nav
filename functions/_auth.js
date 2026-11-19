@@ -40,7 +40,7 @@ async function legacyHash(password, salt) {
   return [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, '0')).join('');
 }
 
-function timingSafeEq(a, b) {
+export function timingSafeEq(a, b) {
   if (typeof a !== 'string' || typeof b !== 'string' || a.length !== b.length) return false;
   let diff = 0;
   for (let i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
@@ -77,6 +77,24 @@ export async function getAdmin(env) {
   try { return JSON.parse(raw); } catch { return null; }
 }
 
+export async function getAdminState(env) {
+  if (!env || !env.NAV_KV) return { admin: null, corrupt: false, missingKv: true };
+  const raw = await env.NAV_KV.get('admin');
+  if (!raw) return { admin: null, corrupt: false };
+  try {
+    const admin = JSON.parse(raw);
+    if (!admin || typeof admin !== 'object' || !admin.salt || !admin.hash) return { admin: null, corrupt: true };
+    return { admin, corrupt: false };
+  } catch { return { admin: null, corrupt: true }; }
+}
+export function kvMissing(env) { return !(env && env.NAV_KV); }
+export function sameOriginOk(request) {
+  try {
+    const origin = request.headers.get('Origin');
+    if (!origin) return true;
+    return new URL(origin).host === new URL(request.url).host;
+  } catch { return false; }
+}
 export function sessionToken(request) {
   const cookie = request.headers.get('Cookie') || '';
   const m = cookie.match(/(?:^|;\s*)ymnav=([a-zA-Z0-9-]+)/);
