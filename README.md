@@ -4,7 +4,7 @@
 
 ![版本](https://img.shields.io/badge/版本-v2.1.4-blue) ![Cloudflare Pages](https://img.shields.io/badge/Cloudflare-Pages-F38020?logo=cloudflare&logoColor=white) ![Workers KV](https://img.shields.io/badge/Storage-Workers_KV-F38020) ![Pages Functions](https://img.shields.io/badge/Backend-Pages_Functions-orange) ![JavaScript](https://img.shields.io/badge/JavaScript-单文件前端-F7DF1E?logo=javascript&logoColor=black) ![Free](https://img.shields.io/badge/费用-免费额度-3fb950)
 
-**[下载最新版](https://github.com/YiMing918/ym-nav/releases/latest) · [博客教程](https://bk.ymaym.top/post/ym-nav-guide) · [在线演示](https://nav.yma.gn0.cc)**
+**[下载最新版](https://github.com/YiMing918/ym-nav/releases/latest) · [博客教程](https://bk.ymaym.top/post/ym-nav-guide) · [在线演示](https://nav.yma.gn0.cc) · [视频教程](https://youtu.be/5yOMAUuX3us)**
 
 > 本项目为个人自用而作：作者自己在用的站放的是真实收藏，不公开；另备了一个只放示例数据的 **[演示站](https://nav.yma.gn0.cc)**，可以随便点着看效果。
 > 也可以看下方「效果预览」的截图，或按本文的部署章节一步步搭一个自己的——全文按完全没用过 Cloudflare / GitHub 的新手写的，每一步都拆到点哪个按钮、填什么。
