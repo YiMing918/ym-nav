@@ -1,0 +1,40 @@
+name: ci
+
+# 语法门禁：推送与 PR 时对全部 JS（含 functions 与前端内联脚本的粗检）
+# 做 node --check，避免语法错误直接随 Pages 部署上线。
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  syntax:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: node --check all function scripts
+        run: |
+          fail=0
+          for f in $(find functions -name '*.js'); do
+            node --check "$f" || fail=1
+          done
+          exit $fail
+      - name: extract and check inline scripts in index.html
+        run: |
+          node -e "
+          const fs = require('fs');
+          const html = fs.readFileSync('index.html', 'utf8');
+          const blocks = [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].map(m => m[1]);
+          if (!blocks.length) { console.error('no inline scripts found'); process.exit(1); }
+          blocks.forEach((code, i) => fs.writeFileSync('/tmp/inline_' + i + '.js', code));
+          console.log('extracted', blocks.length, 'inline script blocks');
+          "
+          fail=0
+          for f in /tmp/inline_*.js; do node --check "$f" || fail=1; done
+          exit $fail
+      - name: run tests
+        run: |
+          for f in tests/*.mjs; do node "$f" || exit 1; done
