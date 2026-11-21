@@ -1,0 +1,54 @@
+name: auto-upgrade
+
+# 每周自动试升级（周一 08:50 北京时间）：在锁文件允许的范围内试升工具 esbuild / wrangler，
+# 全套测试 + 工具链验证都过才提交（提交后 Pages 连 Git 自动部署上线）；
+# 任何一步不过就整次作废，仓库和线上保持原样。这台机器自己也靠下面的心跳文件
+# 证明在岗：哪周没留下心跳，就是它自己出故障了，巡检会报出来。
+on:
+  schedule:
+    - cron: '50 0 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: auto-upgrade-ym-nav
+  cancel-in-progress: false
+
+jobs:
+  upgrade:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: 试升级依赖（锁文件范围内）
+        run: |
+          npm update --no-audit --no-fund
+          npm ci --no-audit --no-fund
+      - name: 跑仓库测试（不过不提交）
+        run: |
+          for f in tests/*.mjs; do node "$f" || exit 1; done
+      - name: 验工具链（esbuild / wrangler 能跑）
+        run: |
+          ./node_modules/.bin/esbuild --version
+          ./node_modules/.bin/wrangler --version
+      - name: 有升级就提交，没升级就留心跳
+        run: |
+          DATE=$(TZ=Asia/Shanghai date +%F)
+          echo "last auto-upgrade run: $DATE" > .github/auto-upgrade-heartbeat.txt
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          if git diff --quiet -- package.json package-lock.json; then
+            git add .github/auto-upgrade-heartbeat.txt
+            git commit -m "chore: 每周试升级心跳 $DATE [skip ci]"
+            git push
+            echo "本周没有可升级的依赖，已留心跳。"
+          else
+            git add package.json package-lock.json .github/auto-upgrade-heartbeat.txt
+            git commit -m "auto-upgrade: 依赖周更 $DATE（测试全过）"
+            git push
+            echo "已提交升级，Pages 连 Git 会自动部署上线。"
+          fi
