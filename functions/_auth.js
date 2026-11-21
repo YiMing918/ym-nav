@@ -118,9 +118,18 @@ export function adminVer(admin) {
 export async function isAuthed(request, env) {
   const token = sessionToken(request);
   if (!token) return false;
+  // Fail closed: no usable admin record (key deleted, value corrupted)
+  // means NO session is valid. The old code compared against
+  // adminVer(getAdmin()) — admin missing/corrupt made getAdmin return
+  // null and adminVer fall back to 1, quietly reviving every stored v1
+  // session, including after the "delete the admin key to reset the
+  // password" recovery flow. getAdminState already distinguishes
+  // corrupt records (setup refuses on them); auth refuses on them too.
+  const state = await getAdminState(env);
+  if (!state.admin) return false;
   const v = await env.NAV_KV.get(await sessionKey(token));
   if (!v) return false;
-  const expect = adminVer(await getAdmin(env));
+  const expect = adminVer(state.admin);
   if (v === 'v' + expect) return true;
   // Legacy sessions stored a plain '1' before versioning; they count as v1
   // and die on the first password change like everyone else.

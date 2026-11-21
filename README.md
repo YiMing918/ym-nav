@@ -2,7 +2,7 @@
 
 一个为自己使用习惯写的个人网址导航站：界面清爽、后台顺手、数据完全归自己。基于 **Cloudflare Pages + Pages Functions + Workers KV** 构建，全部运行在免费额度内，无需服务器、无需数据库。
 
-![版本](https://img.shields.io/badge/版本-v2.1.4-blue) ![Cloudflare Pages](https://img.shields.io/badge/Cloudflare-Pages-F38020?logo=cloudflare&logoColor=white) ![Workers KV](https://img.shields.io/badge/Storage-Workers_KV-F38020) ![Pages Functions](https://img.shields.io/badge/Backend-Pages_Functions-orange) ![JavaScript](https://img.shields.io/badge/JavaScript-单文件前端-F7DF1E?logo=javascript&logoColor=black) ![Free](https://img.shields.io/badge/费用-免费额度-3fb950)
+![版本](https://img.shields.io/badge/版本-v2.1.5-blue) ![Cloudflare Pages](https://img.shields.io/badge/Cloudflare-Pages-F38020?logo=cloudflare&logoColor=white) ![Workers KV](https://img.shields.io/badge/Storage-Workers_KV-F38020) ![Pages Functions](https://img.shields.io/badge/Backend-Pages_Functions-orange) ![JavaScript](https://img.shields.io/badge/JavaScript-单文件前端-F7DF1E?logo=javascript&logoColor=black) ![Free](https://img.shields.io/badge/费用-免费额度-3fb950)
 
 **[下载最新版](https://github.com/YiMing918/ym-nav/releases/latest) · [博客教程](https://bk.ymaym.top/post/ym-nav-guide) · [在线演示](https://nav.yma.gn0.cc) · [视频教程](https://youtu.be/5yOMAUuX3us)**
 
@@ -1295,6 +1295,10 @@ KV 内部 key 一览：
 
 
 ## 📝 更新日志
+### v2.1.5 · 2026-11-21
+
+- **安全修复（第三轮外部审计核实后）**：堵住一个鉴权口子——管理员记录（KV 里的 `admin` 键）要是被删掉或写坏，旧登录此前会被当成最初版的登录放行，拿着旧登录还能改站点配置。现在改成「记录异常一律拒绝」：记录不在或坏了，所有旧登录当场失效，一个都进不来。顺带把「删掉 admin 键重新设密码」这条找回密码的路补严：重建记录时换上一个随机版本号，重设密码之后，之前的旧登录全部作废，不会再出现「密码换了、旧登录还能用」。正常登录、首次设置、改密码都不受影响；没有版本号的老记录（很早以前建的）照常能登。新增 tests/auth-failclosed.test.mjs 22 项（改前 9 项失败复现、改后全过），自带另三套测试 24 项不回归。
+
 ### v2.1.4 · 2026-11-19
 
 - **安全修复（外部审查逐条核实后）**：① 链接网址改白名单入库——含 Tab/换行等控制字符的网址一律拒绝，解析后只许 http/https，堵住 `java<TAB>script:` 这类绕过黑名单的存储型 XSS；前端渲染再兜底，非 http(s) 的 href 一律降级为 `#`。② 首次设置的 SETUP_KEY 改恒时比较并接上与登录同款的失败限流（内存计数、尽力而为）；用户名不许为空、密码加长度上限。③ 图标抓取收紧到「配置里有的主机 + 80/443 端口」，重定向每一跳同样复查；测活（probe）要探站长自己的服务，端口不限、保持不变。④ 所有 POST /api/* 加同源校验（带 Origin 时必须同源）。⑤ 配置保存加结构与长度校验（分类/链接 id 必填且不重复、字段长度上限、请求体上限），颜色/图标类名服务端只放行十六进制色值与 fa-* 类名、其余自动清洗；配置原文或点击计数在 KV 里损坏时保存/计数会报错保原文，不再静默覆盖清零。⑥ 壁纸上传改流式限长（读入过程中超 4.5MB 即断），图与类型合并成一条 KV 记录单次写入，不再出现新图配旧类型；旧两键数据照常可读。⑦ 管理员记录损坏时首次设置返回 500 而不是进首设分支；config/click/login/setup 补 KV 未绑定时返回 JSON 500。⑧ 安全头补齐：新增完整 CSP（脚本只许本站与 cdnjs、内联脚本为本站单文件所需）、HSTS 与 Permissions-Policy，`_headers` 与直传包的内置头表两处同步。⑨ README 限流口径订正为「尽力而为」（见数据表）。会话绑定模型（首次设置竞态 H3）与旧哈希强制迁移经评估不改：前者窗口极窄且改会话模型风险更大，后者登录时已自动升级 PBKDF2、强制迁移有锁死风险。

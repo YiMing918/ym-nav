@@ -36,7 +36,12 @@ export async function onRequestPost({ request, env }) {
     if (password.length > MAX_PW) return json({ error: 'password too long' }, 400);
     const salt = randomHex(16);
     const hash = await hashPassword(password, salt);
-    await env.NAV_KV.put('admin', JSON.stringify({ username, salt, hash, ver: 1 }));
+    // ver 写随机数而不是 1：这条分支既是首次设置、也是「删掉 admin 键
+    // 找回密码」的重建入口。重建时旧记录已不可见，若还写 1，删键前
+    // 签发的旧会话（值 'v1'）会原地复活；随机 ver 与旧值撞上的概率
+    // 可忽略，旧会话自然全灭。改密路径仍在现值上 +1（见下方）。
+    const ver = 1 + (parseInt(randomHex(4), 16) % 1000000000);
+    await env.NAV_KV.put('admin', JSON.stringify({ username, salt, hash, ver }));
     const check = await getAdmin(env);
     if (!check || check.salt !== salt || check.hash !== hash) {
       return json({ error: 'setup conflict, please reload and sign in to confirm' }, 409);
