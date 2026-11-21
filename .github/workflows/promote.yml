@@ -1,0 +1,79 @@
+name: promote
+
+# 部署门控（草案，未上线）：main 的 CI 全绿，才把「CI 验过的那个提交」快进推到
+# production 分支；Cloudflare Pages 项目 ym-nav 的生产分支改指 production 后，
+# 只有过门的提交才会触发正式部署。CI 红 → production 一步不动，线上继续跑旧版。
+#
+# 为什么推 head_sha 而不是「最新 main」：本工作流由 ci 的完成事件触发，推的是 ci
+# 刚验过的那个提交本身；就算等待期间 main 又进了新提交，也不会把没验过的捎上。
+#
+# 已知的一条缝：auto-upgrade 用 GITHUB_TOKEN 推回 main 的提交不会自动触发 ci
+# （GitHub 防递归规矩）。补法（见方案 DESIGN.md 改动清单第 3 条）：ci.yml 加
+# workflow_dispatch 触发、auto-upgrade 收尾用 gh workflow run 把 ci 叫起来。
+# 补缝落地前，试升级提交会等下一次人工推送时跟着过门，或在本页手动 Run workflow
+# 补推——补推会先查目标提交的 ci 结论，不是绿灯不推。
+on:
+  workflow_run:
+    workflows: [ci]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  checks: read
+
+concurrency:
+  group: promote-ym-nav
+  cancel-in-progress: false
+
+jobs:
+  promote:
+    # 只认「推 main 触发的 ci 成功」这一种自动触发；PR 的 ci 跑绿了也不算数
+    if: github.event_name == 'workflow_dispatch' || (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push' && github.event.workflow_run.head_branch == 'main')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: 定目标提交并把关
+        id: gate
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          git fetch origin main production
+          if [ "${{ github.event_name }}" = "workflow_run" ]; then
+            TARGET="${{ github.event.workflow_run.head_sha }}"
+            echo "触发来源：ci 全绿，目标 = ci 验过的提交 $TARGET"
+          else
+            TARGET=$(git rev-parse origin/main)
+            echo "触发来源：手动补推，目标 = main 最新提交 $TARGET"
+            CONC=$(gh api "repos/${{ github.repository }}/commits/$TARGET/check-runs?per_page=100" \
+              --jq '[.check_runs[] | select(.name == "syntax")] | sort_by(.completed_at // "") | last | .conclusion // "none"')
+            if [ "$CONC" != "success" ]; then
+              echo "目标提交最近一次 ci 的结论是「$CONC」，不是 success，拒绝补推。"
+              exit 1
+            fi
+            echo "目标提交的 ci 已确认是绿的。"
+          fi
+          if ! git merge-base --is-ancestor "$TARGET" origin/main; then
+            echo "目标提交不在 main 上，拒绝推送。"
+            exit 1
+          fi
+          echo "target=$TARGET" >> "$GITHUB_OUTPUT"
+      - name: 快进推到 production（只许快进，不强推）
+        run: |
+          TARGET="${{ steps.gate.outputs.target }}"
+          if [ "$(git rev-parse origin/production)" = "$TARGET" ]; then
+            echo "production 已经是目标提交，无需推送。"
+            exit 0
+          fi
+          # 不带 --force：不是快进关系时 git push 自己会拒绝，覆盖不了 production 已有内容
+          git push origin "$TARGET:refs/heads/production"
+          echo "已把 $TARGET 推上 production，Cloudflare Pages 会自动开始正式部署。"
+      - name: 留个记录
+        if: always()
+        run: |
+          echo "## promote 结果" >> "$GITHUB_STEP_SUMMARY"
+          echo "- 目标提交：${{ steps.gate.outputs.target }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "- production 现在指向：$(git ls-remote origin production | cut -f1)" >> "$GITHUB_STEP_SUMMARY"
