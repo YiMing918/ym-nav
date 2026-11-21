@@ -41,14 +41,18 @@ jobs:
           echo "last auto-upgrade run: $DATE" > .github/auto-upgrade-heartbeat.txt
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          if git diff --quiet -- package.json package-lock.json; then
-            git add .github/auto-upgrade-heartbeat.txt
-            git commit -m "chore: 每周试升级心跳 $DATE [skip ci]"
-            git push
-            echo "本周没有可升级的依赖，已留心跳。"
-          else
-            git add package.json package-lock.json .github/auto-upgrade-heartbeat.txt
-            git commit -m "auto-upgrade: 依赖周更 $DATE（测试全过）"
-            git push
-            echo "已提交升级，Pages 连 Git 会自动部署上线。"
+          UPGRADED=0
+          git diff --quiet -- package.json package-lock.json || UPGRADED=1
+          git add package.json package-lock.json .github/auto-upgrade-heartbeat.txt
+          if git diff --cached --quiet; then
+            echo "没有可提交的改动（依赖没升级、心跳日期也没变），本次正常结束。"
+            exit 0
           fi
+          if [ "$UPGRADED" = "1" ]; then
+            git commit -m "auto-upgrade: 依赖周更 $DATE（测试全过）"
+            echo "已提交升级，Pages 连 Git 会自动部署上线。"
+          else
+            git commit -m "chore: 每周试升级心跳 $DATE [skip ci]"
+            echo "本周没有可升级的依赖，已留心跳。"
+          fi
+          git push
