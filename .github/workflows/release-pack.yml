@@ -78,6 +78,8 @@ jobs:
           functions/api/setup.js
           functions/api/wallpaper.js
           index.html
+          package.json
+          package-lock.json
           PACKLIST
           find stage -type f -exec touch -d '1980-01-01 00:00:00' {} +
           cd stage
