@@ -11,6 +11,7 @@ on:
 
 permissions:
   contents: write
+    actions: write
 
 concurrency:
   group: auto-upgrade-ym-nav
@@ -56,3 +57,6 @@ jobs:
             echo "本周没有可升级的依赖，已留心跳。"
           fi
           git push
+          # GITHUB_TOKEN 推回 main 不会触发 ci（防递归），这里手动把 ci 叫起来，
+          # ci 绿了 promote 才会把提交推上 production，正式版才跟得上。
+          gh workflow run ci.yml --ref main || echo "触发 ci 失败，下次推送时再试"
