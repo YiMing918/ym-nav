@@ -105,5 +105,26 @@ const chk = (name, cond, extra = '') => { if (cond) { pass++; console.log('PASS'
   chk('C-28 正常首次设置照常成功', res2.status === 200 && !!(await res2.json()).ok, 'status=' + res2.status);
 }
 
+// ---------- v2.1.6 测活畸形条目：items 混入 null/数字/字符串不能整批 500 ----------
+{
+  const { onRequestPost: probe } = await import('../functions/api/probe.js');
+  const { sessionKey } = await import('../functions/_auth.js');
+  const kv = new KV();
+  const env = { NAV_KV: kv };
+  const hash = await hashPassword('secret-1', 'saltx');
+  kv.m.set('admin', JSON.stringify({ username: 'boss', salt: 'saltx', hash, ver: 2 }));
+  kv.m.set(await sessionKey('tokprobe'), 'v2');
+  const res = await probe({
+    request: new Request('https://nav.test/api/probe', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', cookie: 'ymnav=tokprobe', 'cf-connecting-ip': '6.6.6.6' },
+      body: JSON.stringify({ items: [null, 42, 'https://example.com/', { id: 'bad', url: 'not a url' }] }),
+    }), env,
+  });
+  const j = await res.json();
+  chk('v2.1.6 测活混入畸形条目不崩、只回正常条目结果', res.status === 200 && Array.isArray(j.results) && j.results.length === 1 && j.results[0].id === 'bad' && j.results[0].status === 'dead',
+    `status=${res.status} ${JSON.stringify(j)}`);
+}
+
 console.log(`\nTOTAL pass=${pass} fail=${failN}`);
 process.exit(failN ? 1 : 0);
