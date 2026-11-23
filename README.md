@@ -2,7 +2,7 @@
 
 一个为自己使用习惯写的个人网址导航站：界面清爽、后台顺手、数据完全归自己。基于 **Cloudflare Pages + Pages Functions + Workers KV** 构建，全部运行在免费额度内，无需服务器、无需数据库。
 
-![版本](https://img.shields.io/badge/版本-v2.1.5-blue) ![Cloudflare Pages](https://img.shields.io/badge/Cloudflare-Pages-F38020?logo=cloudflare&logoColor=white) ![Workers KV](https://img.shields.io/badge/Storage-Workers_KV-F38020) ![Pages Functions](https://img.shields.io/badge/Backend-Pages_Functions-orange) ![JavaScript](https://img.shields.io/badge/JavaScript-单文件前端-F7DF1E?logo=javascript&logoColor=black) ![Free](https://img.shields.io/badge/费用-免费额度-3fb950)
+![版本](https://img.shields.io/badge/版本-v2.1.6-blue) ![Cloudflare Pages](https://img.shields.io/badge/Cloudflare-Pages-F38020?logo=cloudflare&logoColor=white) ![Workers KV](https://img.shields.io/badge/Storage-Workers_KV-F38020) ![Pages Functions](https://img.shields.io/badge/Backend-Pages_Functions-orange) ![JavaScript](https://img.shields.io/badge/JavaScript-单文件前端-F7DF1E?logo=javascript&logoColor=black) ![Free](https://img.shields.io/badge/费用-免费额度-3fb950)
 
 **[下载最新版](https://github.com/YiMing918/ym-nav/releases/latest) · [博客教程](https://bk.ymaym.top/post/ym-nav-guide) · [在线演示](https://nav.yma.gn0.cc) · [视频教程](https://youtu.be/5yOMAUuX3us)**
 
@@ -1296,6 +1296,9 @@ KV 内部 key 一览：
 
 
 ## 📝 更新日志
+### v2.1.6 · 2026-11-23
+
+- **修测活接口被畸形数据整批打崩（全量审计后修复）**：后台「链接测活」接口收到的数据里只要混进一条不是正常对象的条目（比如空条目），整个接口就直接报错、一批链接全测不出结果。现在先把畸形条目滤掉再测，正常条目照常出结果。新增 tests/c-fixes.mjs 1 项（改前抛错复现、改后通过），自带其余测试不回归。
 ### v2.1.5 · 2026-11-21
 
 - **安全修复（第三轮外部审计核实后）**：堵住一个鉴权口子——管理员记录（KV 里的 `admin` 键）要是被删掉或写坏，旧登录此前会被当成最初版的登录放行，拿着旧登录还能改站点配置。现在改成「记录异常一律拒绝」：记录不在或坏了，所有旧登录当场失效，一个都进不来。顺带把「删掉 admin 键重新设密码」这条找回密码的路补严：重建记录时换上一个随机版本号，重设密码之后，之前的旧登录全部作废，不会再出现「密码换了、旧登录还能用」。正常登录、首次设置、改密码都不受影响；没有版本号的老记录（很早以前建的）照常能登。新增 tests/auth-failclosed.test.mjs 22 项（改前 9 项失败复现、改后全过），自带另三套测试 24 项不回归。
