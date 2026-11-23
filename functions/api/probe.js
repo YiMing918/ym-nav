@@ -59,7 +59,12 @@ export async function onRequestPost({ request, env }) {
   let body;
   try { body = await request.json(); } catch { return json({ error: 'bad json' }, 400); }
   if (!body || typeof body !== 'object') return json({ error: 'bad json' }, 400);
-  const items = Array.isArray(body.items) ? body.items.slice(0, 25) : [];
+  // 畸形条目（null / 数字 / 字符串）先滤掉：probeOne 会读 item.id /
+  // item.url，一条 null 就能让整批请求抛 TypeError 直接 500（站长在
+  // 后台点「链接测活」时整批无结果）。只留普通对象条目再切片。
+  const items = Array.isArray(body.items)
+    ? body.items.filter((it) => it && typeof it === 'object' && !Array.isArray(it)).slice(0, 25)
+    : [];
   const queue = [...items];
   const results = [];
   const workers = Array.from({ length: 6 }, async () => {
