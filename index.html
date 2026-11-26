@@ -581,7 +581,7 @@ async function applyWpTextMode(st) {
 function applyNameFit() {
   const mode = (S.cfg.settings || {}).nameFit || 'auto';
   document.body.classList.toggle('nf-wrap', mode === 'wrap');
-  const els = [...document.querySelectorAll('#main .tile .nm, #favs .tile .nm')];
+  const els = [...document.querySelectorAll('#main .tile .nm')];
   for (const el of els) { el.style.fontSize = ''; el.classList.remove('fit2'); }
   if (mode !== 'auto') return;
   const jobs = [];
@@ -811,8 +811,17 @@ function flushClicks() {
   clickQ = {};
   persistClickQ();
   const body = JSON.stringify({ items });
-  if (navigator.sendBeacon) navigator.sendBeacon('/api/click', new Blob([body], { type: 'application/json' }));
-  else fetch('/api/click', { method: 'POST', body, keepalive: true }).catch(() => {});
+  // 发送没成功时把计数放回队列、下轮重试，别静默丢（旧写法先清空再
+  // 发，beacon 失败/服务端 429 都无声吞掉，「常去」排行莫名停更）。
+  const restore = () => {
+    for (const [k, v] of Object.entries(items)) clickQ[k] = (clickQ[k] || 0) + v;
+    persistClickQ();
+  };
+  if (navigator.sendBeacon) {
+    if (!navigator.sendBeacon('/api/click', new Blob([body], { type: 'application/json' }))) restore();
+  } else {
+    fetch('/api/click', { method: 'POST', body, keepalive: true }).then(r => { if (!r.ok) restore(); }).catch(restore);
+  }
 }
 function queueClick(id) {
   clickQ[id] = (clickQ[id] || 0) + 1;
@@ -1374,7 +1383,7 @@ $('#probeGo').addEventListener('click', async () => {
         <div style="font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(m.sec)} · ${esc(m.name)}${m.code ? ` <span style="color:var(--muted);font-weight:400">(${m.code})</span>` : ''}</div>
         <div style="color:var(--muted);font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(m.url)}</div>
       </div>
-      ${withDel ? `<button class="btn sm danger" data-del="${m.id}" data-sec="${m.secId}">删除</button>` : ''}
+      ${withDel ? `<button class="btn sm danger" data-del="${esc(m.id)}" data-sec="${esc(m.secId)}">删除</button>` : ''}
     </div>`;
   let html = '';
   if (dead.length) html += `<p style="font-weight:700;margin:10px 0 2px">疑似失效（${dead.length}）</p>` + dead.map((m) => row(m, true)).join('');
@@ -1403,7 +1412,7 @@ $('#pwdGo').addEventListener('click', async () => {
     $('#mPwd').classList.remove('open'); toast(T('密码已修改', 'Password changed'));
   } catch (e) { toast(e.message === 'wrong old password' ? T('旧密码不对', 'Wrong old password') : T('失败：', 'Failed: ') + e.message); }
 });
-$('#langBtn').addEventListener('click', () => { S.lang = S.lang === 'zh' ? 'en' : 'zh'; localStorage.setItem('ymnav_lang', S.lang); render(); });
+$('#langBtn').addEventListener('click', () => { S.lang = S.lang === 'zh' ? 'en' : 'zh'; localStorage.setItem('ymnav_lang', S.lang); $('#langBtn').textContent = S.lang === 'zh' ? 'EN' : '中文'; render(); });
 $('#themeBtn').addEventListener('click', () => {
   const cur = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark';
   document.documentElement.dataset.theme = cur; localStorage.setItem('ymnav_theme', cur);
