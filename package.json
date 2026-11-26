@@ -8,7 +8,7 @@
     "test": "node tests/auth-failclosed.test.mjs && node tests/auth-session.test.mjs && node tests/c-fixes.mjs && node tests/ssrf.test.mjs"
   },
   "devDependencies": {
-    "esbuild": "0.25.0",
-    "wrangler": "3.114.17"
+    "esbuild": "^0.25.0",
+    "wrangler": "^3.114.17"
   }
 }
