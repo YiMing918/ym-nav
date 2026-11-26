@@ -53,6 +53,38 @@ function ipv4Blocked(a, b, c, d) {
   return false;
 }
 
+// 失败计数限流器（登录 / 初始化共用一份实现，低-5）：同 IP 在窗口内
+// 失败达 limit 次锁定 lockMs。只存内存（按 isolate），与 rateLimited
+// 同理不写 KV（KV 写入额度是全账号共享的，2026-11-12 烧穿过一次）。
+// 条目机会性清理（>500 时删过期项），避免长寿 isolate 里 Map 只增不减。
+export function makeFailLimiter({ limit = 5, windowMs = 15 * 60 * 1000, lockMs = 15 * 60 * 1000 } = {}) {
+  const map = new Map();
+  return {
+    locked(ip) {
+      const r = map.get(ip);
+      return !!(r && r.lockUntil && r.lockUntil > Date.now());
+    },
+    clear(ip) {
+      map.delete(ip);
+    },
+    recordFail(ip) {
+      const now = Date.now();
+      let r = map.get(ip);
+      if (!r || !r.winStart || now - r.winStart > windowMs) {
+        r = { fails: 0, winStart: now, lockUntil: 0 };
+      }
+      r.fails = (r.fails || 0) + 1;
+      if (r.fails >= limit) r.lockUntil = now + lockMs;
+      map.set(ip, r);
+      if (map.size > 500) {
+        for (const [k, v] of map) {
+          if ((!v.lockUntil || v.lockUntil <= now) && now - (v.winStart || 0) > windowMs) map.delete(k);
+        }
+      }
+    },
+  };
+}
+
 // Decode a non-standard IPv4 spelling (single integer, 0x-hex parts,
 // octal parts, fewer than 4 parts) the way WHATWG URL does. Returns
 // [a,b,c,d] or null when it is not a numeric form / overflows.
