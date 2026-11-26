@@ -2,7 +2,7 @@
 
 一个为自己使用习惯写的个人网址导航站：界面清爽、后台顺手、数据完全归自己。基于 **Cloudflare Pages + Pages Functions + Workers KV** 构建，全部运行在免费额度内，无需服务器、无需数据库。
 
-![版本](https://img.shields.io/badge/版本-v2.1.7-blue) ![Cloudflare Pages](https://img.shields.io/badge/Cloudflare-Pages-F38020?logo=cloudflare&logoColor=white) ![Workers KV](https://img.shields.io/badge/Storage-Workers_KV-F38020) ![Pages Functions](https://img.shields.io/badge/Backend-Pages_Functions-orange) ![JavaScript](https://img.shields.io/badge/JavaScript-单文件前端-F7DF1E?logo=javascript&logoColor=black) ![Free](https://img.shields.io/badge/费用-免费额度-3fb950)
+![版本](https://img.shields.io/badge/版本-v2.1.8-blue) ![Cloudflare Pages](https://img.shields.io/badge/Cloudflare-Pages-F38020?logo=cloudflare&logoColor=white) ![Workers KV](https://img.shields.io/badge/Storage-Workers_KV-F38020) ![Pages Functions](https://img.shields.io/badge/Backend-Pages_Functions-orange) ![JavaScript](https://img.shields.io/badge/JavaScript-单文件前端-F7DF1E?logo=javascript&logoColor=black) ![Free](https://img.shields.io/badge/费用-免费额度-3fb950)
 
 **[下载最新版](https://github.com/YiMing918/ym-nav/releases/latest) · [博客教程](https://bk.ymaym.top/post/ym-nav-guide) · [在线演示](https://nav.yma.gn0.cc) · [视频教程](https://youtu.be/5yOMAUuX3us)**
 
@@ -1296,6 +1296,10 @@ KV 内部 key 一览：
 
 
 ## 📝 更新日志
+### v2.1.8 · 2026-11-26
+
+- **登录校验补迭代次数钳制（外部审查指出）**：密码哈希里存的 PBKDF2 迭代次数以前读出来直接用——存储值一旦被改坏或篡改成天文数字，一次登录就能把计算拖死（DoS）。现在钳制在 10000–200000 之间（与 ym-dash 的 clampIter 同款）；存量哈希都是本站以 100000 生成的，正常登录不受影响。四套测试共 47 项全过。
+
 ### v2.1.7 · 2026-11-26
 - 登录与初始化两处失败限流合并成共享实现（_ssrf.js 的 makeFailLimiter，低-5）：此前两边各手写一份几乎相同的内存计数、且计数表只增不删；现在共用一份，口径不变（同 IP 15 分钟失败 5 次锁 15 分钟、登录成功清零），并带机会性清理（条目超 500 时删过期项），长寿 isolate 里不再只增不减。
 
