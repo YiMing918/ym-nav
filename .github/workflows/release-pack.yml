@@ -127,7 +127,8 @@ jobs:
           WZIPNAME: ${{ steps.t.outputs.wzip }}
         run: |
           set -euo pipefail
-          npx -y esbuild@0.25.0 build/worker-entry.js --bundle --format=esm \
+          npm ci --no-audit --no-fund
+          ./node_modules/.bin/esbuild build/worker-entry.js --bundle --format=esm \
             --platform=neutral --target=es2022 --outfile=_worker.js
           rm -rf stage-worker && mkdir stage-worker
           cp _worker.js stage-worker/
