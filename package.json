@@ -1,6 +1,6 @@
 {
   "name": "ym-nav",
-  "version": "2.1.6",
+  "version": "2.1.7",
   "private": true,
   "type": "module",
   "description": "个人导航站：Pages + Functions + KV，无构建步骤。本文件仅用于锁定 esbuild / wrangler 版本（流水线 npm ci 装本地版，不再现拉），站点本身零依赖。",
