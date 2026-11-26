@@ -16,7 +16,7 @@
 // Cache writes are additionally restricted to hosts that exist in the
 // site config — a stranger host is resolved live but never persisted,
 // so wildcard-DNS host spraying cannot mint KV writes.
-import { json } from '../_auth.js';
+import { json, isAuthed } from '../_auth.js';
 import { assertSafeUrl, safeFetch, rateLimited, readBodyLimited } from '../_ssrf.js';
 
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36';
@@ -48,15 +48,23 @@ function iconUrlAllowed(u, allowedHosts) {
   if (allowedHosts && !allowedHosts.has(url.hostname.toLowerCase())) throw new Error('icon host not in config');
   return url;
 }
-async function loadConfigHosts(env) {
+async function loadConfigHosts(env, authed) {
   if (!env || !env.NAV_KV) return null;
   try {
     const rawCfg = await env.NAV_KV.get('site_config');
     if (!rawCfg) return new Set();
     const cfg = JSON.parse(rawCfg);
     const hosts = new Set();
-    for (const s of (Array.isArray(cfg.sections) ? cfg.sections : [])) for (const l of (s && Array.isArray(s.links) ? s.links : [])) {
-      try { hosts.add(new URL(l.url).hostname.toLowerCase()); } catch { }
+    // 未登录时与 /api/config 同口径：私密分区、私密链接的主机不进名单——
+    // 否则匿名者能凭主机名取到私密站点的图标并确认其存在，等于把 config
+    // 的私密过滤从图标这条路又开回来（已缓存的图标也一样，名单检查在
+    // 查缓存之前）。
+    for (const s of (Array.isArray(cfg.sections) ? cfg.sections : [])) {
+      if (!s || (s.private && !authed)) continue;
+      for (const l of (Array.isArray(s.links) ? s.links : [])) {
+        if (!l || (l.private && !authed)) continue;
+        try { hosts.add(new URL(l.url).hostname.toLowerCase()); } catch { }
+      }
     }
     return hosts;
   } catch { return new Set(); }
@@ -142,7 +150,7 @@ export async function onRequestGet({ request, env }) {
   const host = u.hostname.toLowerCase();
   // H4 port gate applies even when KV/config is unavailable.
   if (u.port && u.port !== '80' && u.port !== '443') return json({ error: 'blocked' }, 400);
-  const allowedHosts = await loadConfigHosts(env);
+  const allowedHosts = await loadConfigHosts(env, await isAuthed(request, env));
   // When a config exists, only its hosts may be fetched at all (not just
   // cached). With no KV binding there is no config to check against, so
   // the port + SSRF gates alone apply (degraded local/test mode).
