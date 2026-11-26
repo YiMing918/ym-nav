@@ -18,10 +18,12 @@ export async function onRequestPost({ request, env }) {
   if (!sameOriginOk(request)) return json({ error: 'cross-origin request rejected' }, 403);
   // 本端点匿名可调且每个有效请求固定写 1 次 KV——此前零限流，循环
   // POST 1000 次就能烧完全账号当天的 KV 写额度（2026-11-12 事故的
-  // 同款形状），顺带刷爆任意链接的计数。复用现成内存限流：正常
-  // 前端 20 秒才 flush 一次，30 次/15 分钟绰绰有余；计数仍只在内存，
+  // 同款形状），顺带刷爆任意链接的计数。复用现成内存限流；额度按
+  // 前端节奏核算：定时 flush 每 20 秒一次，15 分钟最多 45 次，再加
+  // 「攒满 8 次立即 flush」的突发，60 次/15 分钟才够用（旧值 30 会把
+  // 正常浏览的用户误伤成 429、计数还静默丢失）；计数仍只在内存，
   // 不为限流本身再写 KV。
-  if (await rateLimited(env, request, { scope: 'click', limit: 30 })) {
+  if (await rateLimited(env, request, { scope: 'click', limit: 60 })) {
     return json({ error: 'too many attempts, try again in 15 minutes' }, 429);
   }
   let body;
