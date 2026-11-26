@@ -1,7 +1,7 @@
 name: promote
 
-# 部署门控（草案，未上线）：main 的 CI 全绿，才把「CI 验过的那个提交」快进推到
-# production 分支；Cloudflare Pages 项目 ym-nav 的生产分支改指 production 后，
+# 部署门控（已上线）：main 的 CI 全绿，才把「CI 验过的那个提交」快进推到
+# production 分支；Cloudflare Pages 项目 ym-nav 的生产分支已改指 production，
 # 只有过门的提交才会触发正式部署。CI 红 → production 一步不动，线上继续跑旧版。
 #
 # 为什么推 head_sha 而不是「最新 main」：本工作流由 ci 的完成事件触发，推的是 ci
