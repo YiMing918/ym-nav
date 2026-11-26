@@ -23,6 +23,8 @@ jobs:
             node --check "$f" || fail=1
           done
           exit $fail
+      - name: node --check release-pack worker entry
+        run: node --check build/worker-entry.js
       - name: extract and check inline scripts in index.html
         run: |
           node -e "
