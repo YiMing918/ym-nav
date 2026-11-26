@@ -3,14 +3,8 @@
 //    SETUP_KEY compared in constant time (H2); failed attempts rate-limited like login.
 //  - Change password (logged in):  { oldPassword, newPassword }
 import { json, getAdmin, getAdminState, kvMissing, sameOriginOk, timingSafeEq, hashPassword, verifyPassword, randomHex, createSession, sessionCookie, isAuthed, adminVer } from '../_auth.js';
-const setupFails = new Map();
-function rlLocked(ip) { const r = setupFails.get(ip); return !!(r && r.lockUntil && r.lockUntil > Date.now()); }
-function rlRecordFail(ip) {
-  const now = Date.now(); let r = setupFails.get(ip);
-  if (!r || !r.winStart || now - r.winStart > 15 * 60 * 1000) r = { fails: 0, winStart: now, lockUntil: 0 };
-  r.fails = (r.fails || 0) + 1; if (r.fails >= 5) r.lockUntil = now + 15 * 60 * 1000;
-  setupFails.set(ip, r);
-}
+import { makeFailLimiter } from '../_ssrf.js';
+const { locked: rlLocked, recordFail: rlRecordFail, clear: rlClear } = makeFailLimiter();
 const MAX_PW = 128;
 export async function onRequestPost({ request, env }) {
   if (kvMissing(env)) return json({ error: 'KV binding NAV_KV missing' }, 500);
@@ -46,7 +40,7 @@ export async function onRequestPost({ request, env }) {
     if (!check || check.salt !== salt || check.hash !== hash) {
       return json({ error: 'setup conflict, please reload and sign in to confirm' }, 409);
     }
-    setupFails.delete(ip);
+    rlClear(ip);
     const token = await createSession(env);
     return json({ ok: true, created: true }, 200, { 'Set-Cookie': sessionCookie(token) });
   }
