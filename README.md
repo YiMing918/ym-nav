@@ -2,7 +2,7 @@
 
 一个为自己使用习惯写的个人网址导航站：界面清爽、后台顺手、数据完全归自己。基于 **Cloudflare Pages + Pages Functions + Workers KV** 构建，全部运行在免费额度内，无需服务器、无需数据库。
 
-![版本](https://img.shields.io/badge/版本-v2.1.9-blue) ![Cloudflare Pages](https://img.shields.io/badge/Cloudflare-Pages-F38020?logo=cloudflare&logoColor=white) ![Workers KV](https://img.shields.io/badge/Storage-Workers_KV-F38020) ![Pages Functions](https://img.shields.io/badge/Backend-Pages_Functions-orange) ![JavaScript](https://img.shields.io/badge/JavaScript-单文件前端-F7DF1E?logo=javascript&logoColor=black) ![Free](https://img.shields.io/badge/费用-免费额度-3fb950)
+![版本](https://img.shields.io/badge/版本-v2.1.10-blue) ![Cloudflare Pages](https://img.shields.io/badge/Cloudflare-Pages-F38020?logo=cloudflare&logoColor=white) ![Workers KV](https://img.shields.io/badge/Storage-Workers_KV-F38020) ![Pages Functions](https://img.shields.io/badge/Backend-Pages_Functions-orange) ![JavaScript](https://img.shields.io/badge/JavaScript-单文件前端-F7DF1E?logo=javascript&logoColor=black) ![Free](https://img.shields.io/badge/费用-免费额度-3fb950)
 
 **[下载最新版](https://github.com/YiMing918/ym-nav/releases/latest) · [博客教程](https://bk.ymaym.top/post/ym-nav-guide) · [在线演示](https://nav.yma.gn0.cc) · [视频教程](https://youtu.be/5yOMAUuX3us)**
 
@@ -1296,6 +1296,9 @@ KV 内部 key 一览：
 
 
 ## 📝 更新日志
+### v2.1.10 · 2026-11-27
+修外部搜索点了没反应：在百度/Google 等外部引擎里搜，点了搜索或按回车毫无反应。根因是页面里开弹窗的函数名就叫 `open`，它把浏览器自带的 `window.open` 顶掉了，搜索时拿着网址去当弹窗找、直接报错。改成用一个临时链接去打开结果页，外部搜索恢复正常。主题切换经真浏览器逐项核对本来就是好的。
+
 ### v2.1.9 · 2026-11-27
 逐按钮实测修一处：设置里的壁纸地址框以前是网址型输入框，但用站内上传壁纸后回填的是站内相对地址（/api/wallpaper?v=…），浏览器会把这个框标成「无效」红框——其实地址完全合法、壁纸也正常显示。改成普通文本框，不再误报。
 
