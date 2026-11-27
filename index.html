@@ -765,7 +765,16 @@ const ENGINES = {
 function doSearch() {
   const q = $('#q').value.trim();
   const eng = $('#engine').value;
-  if (eng !== 'site' && q) { window.open(ENGINES[eng](q), '_blank'); return; }
+  if (eng !== 'site' && q) {
+    // 不能用 window.open：本页开弹窗的全局函数就叫 open()，顶层函数声明
+    // 会把 window.open 整个顶掉——拿网址当弹窗选择器去查，直接报错、
+    // 什么都不打开（2026-11-27 真浏览器实测定位，栈：doSearch→open→$）。
+    // 改用临时 <a target=_blank> 点击，效果一样且不受顶替影响。
+    const a = document.createElement('a');
+    a.href = ENGINES[eng](q); a.target = '_blank'; a.rel = 'noopener';
+    document.body.appendChild(a); a.click(); a.remove();
+    return;
+  }
   S.query = q; render();
 }
 $('#q').addEventListener('input', () => { if ($('#engine').value === 'site') { S.query = $('#q').value.trim(); render(); } });
