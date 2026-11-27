@@ -37,6 +37,8 @@ jobs:
           ./node_modules/.bin/esbuild --version
           ./node_modules/.bin/wrangler --version
       - name: 有升级就提交，没升级就留心跳
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           DATE=$(TZ=Asia/Shanghai date +%F)
           echo "last auto-upgrade run: $DATE" > .github/auto-upgrade-heartbeat.txt
@@ -59,4 +61,8 @@ jobs:
           git push
           # GITHUB_TOKEN 推回 main 不会触发 ci（防递归），这里手动把 ci 叫起来，
           # ci 绿了 promote 才会把提交推上 production，正式版才跟得上。
-          gh workflow run ci.yml --ref main || echo "触发 ci 失败，下次推送时再试"
+          if ! gh workflow run ci.yml --ref main; then
+            echo "::error::触发 ci 失败：升级提交已在 main 上，但 CI 没跑起来，promote 不会动，production 会悄悄落后——请到 Actions 页手动跑一次 ci。"
+            echo "❌ 触发 ci 失败，production 会落后，请手动跑一次 ci。" >> "$GITHUB_STEP_SUMMARY"
+            exit 1
+          fi
